@@ -31,6 +31,27 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
     LOG((Error)) << s << endl;\
     return((x)); }
 
+// #define  MAX_SEQ     7
+// #define inc(k) if(k<MAX_SEQ) k++; else k=0;
+
+typedef unsigned int seq_nr;    //send seq
+
+struct packet{
+    unsigned char data[LEN_PKG_DATA] = {0};
+};
+
+typedef enum {
+    data,
+    ack,
+    nak
+}frame_kind;  //frame types: data/ack/nak
+
+struct frame{
+    frame_kind kind;
+    seq_nr     seq;
+    seq_nr     ack;
+    packet     info;
+};
 
 
 Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level = Debug);
