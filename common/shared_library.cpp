@@ -1,5 +1,8 @@
 #include "shared_library.hpp"
 
+/*****************************/
+/*****  Network Layer   ******/
+/*****************************/
 Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level) {
     // log_stream must not be opened before getting into this function.
     if (log_stream.is_open()) {
@@ -14,37 +17,165 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     return ALL_GOOD;
 }
 
+
+
+/*****************************/
+/*****  Datalink Layer   *****/
+/*****************************/
+
+Status sender_datalink_layer_test(int *pipe) {
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    close(pipe[p_write]);    // read only
+    char pipe_buf[20];
+    if (read(pipe[p_read], pipe_buf, 20) <= 0) {
+        LOG(Error) << "Pipe read from SNL to SDL error" << endl;
+        return E_PIPE_READ;
+    }
+    LOG(Info) << "Get info from SNL: " << pipe_buf << endl;
+    close(pipe[p_read]);
+    LOG(Info) << "SDL test passed!" << endl;
+    return ALL_GOOD;
+}
+
+Status sender_datalink_layer(DProtocol protocol, int *pipe) {
+    Status val;
+    switch(protocol) {
+        case(test): {
+            LOG(Info) << "Getting into SDL with protocol: " << "test" << endl;
+            val = sender_datalink_layer_test(pipe);
+            LOG(Debug) << "Return value of sender_datalink_layer_test\t" << val << endl;
+            return val;
+        }
+        case(utopia): {
+            LOG(Info) << "Getting into SDL with protocol: utopia" << "test" << endl;
+            val = sender_datalink_layer_utopia(pipe);
+            LOG(Debug) << "Return value of sender_datalink_layer_test\t" << val << endl;
+            return val;
+        }
+        default: {
+            LOG(Error) << "Datalink protocol selection error" << endl;
+            return E_DATALINK_SELECT;
+        }
+    }
+}
+
+Status sender_datalink_layer_utopia(int *pipe){
+    //clsoe write port
+    close(pipe[p_write]);
+    frame s;
+    packet buffer;
+    Status rtn;
+
+    //enable_network_layer();
+    while(true){
+        rtn = from_network_layer(&buffer, pipe);
+        if(rtn == E_PIPE_READ)  
+            return rtn;
+
+        s.info = buffer;
+        return (to_physical_layer(&s));
+    }
+}
+
+Status from_network_layer(packet *p, int *pipe){
+    char pipe_buf[RAW_DATA_SIZE + 1];
+    //p_write closed in upper function
+    if (read(pipe[p_read], pipe_buf, RAW_DATA_SIZE) <= 0) {
+        LOG(Error) << "sender: SNL read from SDL error." << endl;
+        return E_PIPE_READ;
+    }
+    //data starts from data[12]
+    memcpy(p->data, pipe_buf, RAW_DATA_SIZE);
+    LOG(Info) << "sender: SDL successfully gets info from SNL."<< endl;
+    return ALL_GOOD;
+}   
+
+Status to_physical_layer(frame *s){
+    Status rtn;
+    int pipe_datalink_physical[2];
+    pid_t phy_pid;
+
+    if(pipe(pipe_datalink_physical) == -1){
+        LOG(Error) << "sender: Pipe INIT error in datalink layer." << endl;
+        return E_PIPE_INIT;
+    }
+    //avoid zonbe proc
+    signal(SIGCHLD, SIG_IGN);
+    phy_pid = fork();
+
+    if(phy_pid < 0){
+        LOG(Error) << "sender: SDL fork error." << endl;
+        return E_FORK;
+    }
+    else if(phy_pid == 0){
+        LOG(Info) << "sender: SPL start."<< endl;
+        rtn = sender_physical_layer(pipe_datalink_physical);
+        
+        if(rtn == TRANSMISSION_END)
+            LOG(Info) << "sender: Transmission end in SDL." << endl;
+        else if(rtn < 0)
+            LOG(Error) << "sender: SPL failed, returned error in SDL." << endl;
+        else    //return ALL_GOOD
+            LOG(Info) << "sender: SPL end successfully." << endl;
+        return rtn;
+    }
+    else{
+        char pipe_buf[LEN_PKG_DATA+1];
+        memcpy(pipe_buf, &(s->kind), sizeof(int));
+        memcpy(pipe_buf+4, &(s->seq), sizeof(int));
+        memcpy(pipe_buf+8, &(s->ack), sizeof(int));
+        memcpy(pipe_buf+12, s->info.data, RAW_DATA_SIZE);
+
+        close(pipe_datalink_physical[p_read]);  
+        if((write(pipe_datalink_physical[p_write], pipe_buf, LEN_PKG_DATA )) <= 0){
+            LOG(Error) << "sender: SDL write to SPL error." << endl;
+            return E_PIPE_WRITE;
+        }
+        LOG(Info) << "sender: SDL sent frame to SPL successfully." << endl;
+        return ALL_GOOD;
+    }
+}
+
+//not used in Utopia
+void enable_network_layer(void){
+}
+
+
+
+/*****************************/
+/*****  Physical Layer   *****/
+/*****************************/
 int tcp_server_block(const int port) {
     // AF_INET: IPv4 protocol
-	// SOCK_STREAM: TCP protocol
-	int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_fd < 0) { 
-		graceful_return("socket", E_CREATE_SOCKET);
-	} 
-	
-	int opt = 1;
-	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) { 
-		graceful_return("setsockopt", E_SETSOCKOPT);
-	}
+    // SOCK_STREAM: TCP protocol
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) { 
+        graceful_return("socket", E_CREATE_SOCKET);
+    } 
+    
+    int opt = 1;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) { 
+        graceful_return("setsockopt", E_SETSOCKOPT);
+    }
 
-	struct sockaddr_in server_addr; 
-	server_addr.sin_family = AF_INET; 
-	// INADDR_ANY means 0.0.0.0(localhost), or all IP of local machine.
-	server_addr.sin_addr.s_addr = INADDR_ANY;
-	server_addr.sin_port = htons(port); 
-	int server_addrlen = sizeof(server_addr);
-	if (bind(server_fd, (struct sockaddr *) &server_addr, server_addrlen) < 0) { 
-		graceful_return("bind", E_BIND);
-	}
+    struct sockaddr_in server_addr; 
+    server_addr.sin_family = AF_INET; 
+    // INADDR_ANY means 0.0.0.0(localhost), or all IP of local machine.
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port); 
+    int server_addrlen = sizeof(server_addr);
+    if (bind(server_fd, (struct sockaddr *) &server_addr, server_addrlen) < 0) { 
+        graceful_return("bind", E_BIND);
+    }
 
-	if (listen(server_fd, TCP_LISTEN_NUM) < 0) { 
-		graceful_return("listen", E_LISTEN); 
-	}
+    if (listen(server_fd, TCP_LISTEN_NUM) < 0) { 
+        graceful_return("listen", E_LISTEN); 
+    }
 
-	int new_socket = accept(server_fd, (struct sockaddr *)&server_addr, (socklen_t*) &server_addrlen);
-	if (new_socket < 0) { 
-		graceful_return("accept", E_ACCEPT); 
-	}
+    int new_socket = accept(server_fd, (struct sockaddr *)&server_addr, (socklen_t*) &server_addrlen);
+    if (new_socket < 0) { 
+        graceful_return("accept", E_ACCEPT); 
+    }
     else {
         LOG(Info) << "server accept client success" << endl;
     }
@@ -53,30 +184,30 @@ int tcp_server_block(const int port) {
 }
 
 int tcp_client_block(const char *ip, const int port) {
-	// AF_INET_IPv4 protocol
-	// SOCK_STREAM: TCP protocol
-	int client_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (client_fd < 0) { 
-		graceful_return("socket", E_CREATE_SOCKET);
-	}
+    // AF_INET_IPv4 protocol
+    // SOCK_STREAM: TCP protocol
+    int client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_fd < 0) { 
+        graceful_return("socket", E_CREATE_SOCKET);
+    }
 
-	struct sockaddr_in server_addr; 
-	memset(&server_addr, '0', sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(port); 
-	if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
-		LOG(Error) << "wrong peer IP" << endl;
+    struct sockaddr_in server_addr; 
+    memset(&server_addr, '0', sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port); 
+    if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
+        LOG(Error) << "wrong peer IP" << endl;
         graceful_return("wrong peer IP", E_WRONG_IP);
-	} 
+    } 
 
-	if (connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) { 
-		graceful_return("connect", E_CONNECT); 
-	}
-	else {
-		LOG(Info) << "client connect server success" << endl;
-	}
+    if (connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) { 
+        graceful_return("connect", E_CONNECT); 
+    }
+    else {
+        LOG(Info) << "client connect server success" << endl;
+    }
 
-	return client_fd;
+    return client_fd;
 }
 
 Status physical_layer_send(const int socket, const char *buf_send, const bool is_data, const bool is_end) {
@@ -146,36 +277,6 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
     else {
         return ALL_GOOD;
     }
-}
-
-Status sender_datalink_layer(DProtocol protocol, int *pipe) {
-    Status val;
-    switch(protocol) {
-        case(test): {
-            LOG(Info) << "Getting into SDL with protocol: " << "test" << endl;
-            val = sender_datalink_layer_test(pipe);
-            LOG(Debug) << "Return value of sender_datalink_layer_test\t" << val << endl;
-            return val;
-        }
-        default: {
-            LOG(Error) << "Datalink protocol selection error" << endl;
-            return E_DATALINK_SELECT;
-        }
-    }
-}
-
-Status sender_datalink_layer_test(int *pipe) {
-    prctl(PR_SET_PDEATHSIG, SIGHUP);
-    close(pipe[p_write]);    // read only
-    char pipe_buf[20];
-    if (read(pipe[p_read], pipe_buf, 20) <= 0) {
-        LOG(Error) << "Pipe read from SNL to SDL error" << endl;
-        return E_PIPE_READ;
-    }
-    LOG(Info) << "Get info from SNL: " << pipe_buf << endl;
-    close(pipe[p_read]);
-    LOG(Info) << "SDL test passed!" << endl;
-    return ALL_GOOD;
 }
 
 Status sender_physical_layer(int *pipe) {
