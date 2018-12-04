@@ -33,6 +33,8 @@ $(TARGET_RECEIVER_TEST): $(SRC_RECEIVER_TEST) $(OBJ_LIB)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 clean :
-	$(RM) $(TARGET_SENDER) $(TARGET_RECEIVER) $(TARGET_SENDER_TEST) $(TARGET_RECEIVER_TEST) common/*.o
+	$(RM) $(TARGET_SENDER) $(TARGET_RECEIVER) $(TARGET_SENDER_TEST) $(TARGET_RECEIVER_TEST)
+	$(RM) common/*.o
+	$(RM) 01/*.log 02/*.log 03/*.log 04/*.log 05/*.log 06/*.log test/*.log ./*.log
 
 .PHONY : all test clean

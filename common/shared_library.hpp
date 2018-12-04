@@ -28,6 +28,7 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
 // gracefully perror and return
 #define graceful_return(s, x) {\
     perror((s));\
+    LOG((Error)) << s << endl;\
     return((x)); }
 
 int tcp_server_block(const int port = 20350);
@@ -110,4 +111,5 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     // 3. Log level, default the lowest 'Debug'. If higher level is set, lower level information will not be output.
 // Postcondition:
     // 1. All good: return ALL_GOOD, and set the log stream.
-    // 2. Open log error: E_LOG_OPEN.
+    // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
+    // 3. Open log error: E_LOG_OPEN.

@@ -32,7 +32,7 @@ int tcp_server_block(const int port) {
 		graceful_return("accept", E_ACCEPT); 
 	}
     else {
-        cout << "server accept client success" << endl;
+        LOG(Info) << "server accept client success" << endl;
     }
 
     return new_socket;
@@ -51,7 +51,7 @@ int tcp_client_block(const char *ip, const int port) {
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(port); 
 	if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
-		cerr << "wrong peer IP" << endl;
+		LOG(Error) << "wrong peer IP" << endl;
         graceful_return("wrong peer IP", E_WRONG_IP);
 	} 
 
@@ -59,7 +59,7 @@ int tcp_client_block(const char *ip, const int port) {
 		graceful_return("connect", E_CONNECT); 
 	}
 	else {
-		cout << "client connect server success" << endl;
+		LOG(Info) << "client connect server success" << endl;
 	}
 
 	return client_fd;
@@ -87,7 +87,7 @@ Status physical_layer_send(const int socket, const char *buf_send, const bool is
     }
     
     if (total_send > buf_length) {
-        cerr << "wrong byte sent" << endl;
+        LOG(Error) << "wrong byte sent" << endl;
         return E_WRONG_BYTE;
     }
     else {
@@ -113,7 +113,7 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
     }
     
     if (total_recv > buf_length) {
-        cerr << "wrong byte sent" << endl;
+        LOG(Error) << "wrong byte sent" << endl;
         return E_WRONG_BYTE;
     }
     // TODO: better way to check 1036 consecutive bytes from buffer is all '\0'.
