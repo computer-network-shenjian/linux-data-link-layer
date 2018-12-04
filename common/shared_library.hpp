@@ -83,7 +83,7 @@ void enable_network_layer(void);
 Status from_network_layer(packet *p, int *pipe);
 //function:
 //      SDL gets packet from SNL
-//precondition：
+//precondition:
 //      packets are of 1024 bytes already (last bytes != '\0')
 //postcondition:
         // 1.E_PIPE_READ        pipe read error when fetch data from Network Layer
@@ -199,5 +199,12 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
 Status sender_physical_layer(int *pipe);
+// Intro: SPL, get data from SDL from pipe, and send it to RPL by TCP block socket.
+// Function:
+    // 1. Open a TCP client socket.
+    // 2. Loop receive 1036 bytes from SDL from pipe.
+    // 3. Loop send 1036 bytes to RPL by TCP block socket.
+// Precondition: pipe.
+// Postcondition: status number.
 
 Status receiver_physical_layer(int *pipe);
