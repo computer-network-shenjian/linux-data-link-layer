@@ -148,6 +148,7 @@ Status sender_datalink_layer(DProtocol protocol, int *pipe) {
 }
 
 Status sender_datalink_layer_test(int *pipe) {
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
     close(pipe[p_write]);    // read only
     char pipe_buf[20];
     if (read(pipe[p_read], pipe_buf, 20) <= 0) {
