@@ -89,17 +89,19 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 4. Peer disconnected: return E_PEER_DISCONNECTED.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
-Status sender_datalink_layer(const int type);
+Status sender_datalink_layer(DProtocol protocol, int *pipe);
 
-Status sender_datalink_layer_utopia();
+Status sender_datalink_layer_test(int *pipe);
 
-Status sender_physical_layer();
+Status sender_datalink_layer_utopia(int *pipe);
 
-Status receiver_datalink_layer(const int type);
+Status sender_physical_layer(int *pipe);
 
-Status receiver_datalink_layer_utopia();
+Status receiver_datalink_layer(DProtocol protocol);
 
-Status receiver_physical_layer();
+Status receiver_datalink_layer_utopia(int *pipe);
+
+Status receiver_physical_layer(int *pipe);
 
 Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level = Debug);
 // Intro: Initialize logger with given log name and log level.

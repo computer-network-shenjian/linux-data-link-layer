@@ -131,6 +131,35 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
     }
 }
 
+Status sender_datalink_layer(DProtocol protocol, int *pipe) {
+    Status val;
+    switch(protocol) {
+        case(test): {
+            LOG(Info) << "Getting into SDL with protocol: " << "test" << endl;
+            val = sender_datalink_layer_test(pipe);
+            LOG(Debug) << "Return value of sender_datalink_layer_test\t" << val << endl;
+            return val;
+        }
+        default: {
+            LOG(Error) << "Datalink protocol selection error" << endl;
+            return E_DATALINK_SELECT;
+        }
+    }
+}
+
+Status sender_datalink_layer_test(int *pipe) {
+    close(pipe[p_write]);    // read only
+    char pipe_buf[20];
+    if (read(pipe[p_read], pipe_buf, 20) <= 0) {
+        LOG(Error) << "Pipe read from SNL to SDL error" << endl;
+        return E_PIPE_READ;
+    }
+    LOG(Info) << "Get info from SNL: " << pipe_buf << endl;
+    close(pipe[p_read]);
+    LOG(Info) << "SDL test passed!" << endl;
+    return ALL_GOOD;
+}
+
 Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level) {
     // log_stream must not be opened before getting into this function.
     if (log_stream.is_open()) {
