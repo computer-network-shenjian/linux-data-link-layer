@@ -1,8 +1,8 @@
 #include "shared_library.hpp"
 
 int tcp_server_block(const int port) {
-    // AF_INET£ºIPv4 protocol
-	// SOCK_STREAM£ºTCP protocol
+    // AF_INET: IPv4 protocol
+	// SOCK_STREAM: TCP protocol
 	int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd < 0) { 
 		graceful_return("socket", E_CREATE_SOCKET);
@@ -40,7 +40,7 @@ int tcp_server_block(const int port) {
 
 int tcp_client_block(const char *ip, const int port) {
 	// AF_INET_IPv4 protocol
-	// SOCK_STREAM£ºTCP protocol
+	// SOCK_STREAM: TCP protocol
 	int client_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (client_fd < 0) { 
 		graceful_return("socket", E_CREATE_SOCKET);
@@ -118,7 +118,12 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
     }
     // TODO: better way to check 1036 consecutive bytes from buffer is all '\0'.
     memcpy(buf_recv, buffer, buf_length);
+    /*
     if (strlen(buffer) == 0) {
+        return TRANSMISSION_END;
+    }
+    */
+    if (0 == memcmp(all_zero, buffer, LEN_PKG_DATA)) {
         return TRANSMISSION_END;
     }
     else {

@@ -17,6 +17,6 @@ if [ $# -eq 0 ]; then
     echo "Usage: $0 size_in_mb"
 else
     let "size = ($1 * 1024 * 1024) - 2" # a unicode char is 2 bytes long
-    head -c $size </dev/urandom >rand_$1
-    echo 1 >> rand_$1
+    head -c $size </dev/urandom >rand_$1.myfile
+    echo 1 >> rand_$1.myfile
 fi
