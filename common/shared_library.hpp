@@ -20,6 +20,7 @@
 #include "Log.h"
 
 using namespace std;
+using namespace fly;
 
 // gracefully perror and exit
 inline void graceful(const char *s, int x) { perror(s); exit(x); }
@@ -98,3 +99,15 @@ Status receiver_datalink_layer(const int type);
 Status receiver_datalink_layer_utopia();
 
 Status receiver_physical_layer();
+
+Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level = Debug);
+// Intro: Initialize logger with given log name and log level.
+// Caution: when return, it's good to close the stream.
+// Function: Initialize logger with given log name and log level, and set log_stream.
+// Precondition:
+    // 1. Log stream.
+    // 2. Log name.
+    // 3. Log level, default the lowest 'Debug'. If higher level is set, lower level information will not be output.
+// Postcondition:
+    // 1. All good: return ALL_GOOD, and set the log stream.
+    // 2. Open log error: E_LOG_OPEN.

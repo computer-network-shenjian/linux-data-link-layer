@@ -130,3 +130,17 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
         return ALL_GOOD;
     }
 }
+
+Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level) {
+    // log_stream must not be opened before getting into this function.
+    if (log_stream.is_open()) {
+        return E_LOG_OPEN;
+    }
+    log_stream.open(log_name, ios::out|ios::trunc);
+    if (!log_stream.is_open()) {
+        return E_LOG_OPEN;
+    }
+    Log::get().setLogStream(log_stream);
+    Log::get().setLevel(level);
+    return ALL_GOOD;
+}

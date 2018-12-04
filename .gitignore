@@ -3,6 +3,7 @@
 .*.swp
 *.pdf
 *.myfile
+*.log
 sender1
 receiver1
 sender2

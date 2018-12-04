@@ -19,3 +19,7 @@ const int E_SEND = -8;
 const int E_PEER_DISCONNECTED = -9;
 const int E_WRONG_BYTE = -10;
 const int E_RECV = -11;
+
+
+const int E_LOG_ISOPENED = -20;
+const int E_LOG_OPEN = -21;
