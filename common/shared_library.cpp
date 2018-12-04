@@ -39,7 +39,7 @@ int tcp_server_block(const int port) {
 }
 
 int tcp_client_block(const char *ip, const int port) {
-	// AF_INET£ºIPv4 protocol
+	// AF_INET_IPv4 protocol
 	// SOCK_STREAM£ºTCP protocol
 	int client_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (client_fd < 0) { 
@@ -116,7 +116,7 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
         cerr << "wrong byte sent" << endl;
         return E_WRONG_BYTE;
     }
-    
+    // TODO: better way to check 1036 consecutive bytes from buffer is all '\0'.
     memcpy(buf_recv, buffer, buf_length);
     if (strlen(buffer) == 0) {
         return TRANSMISSION_END;
