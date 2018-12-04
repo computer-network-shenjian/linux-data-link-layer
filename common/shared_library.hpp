@@ -31,6 +31,76 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
     LOG((Error)) << s << endl;\
     return((x)); }
 
+
+
+Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level = Debug);
+// Intro: Initialize logger with given log name and log level.
+// Caution: when return, it's good to close the stream.
+// Function: Initialize logger with given log name and log level, and set log_stream.
+// Precondition:
+    // 1. Log stream.
+    // 2. Log name.
+    // 3. Log level, default the lowest 'Debug'. If higher level is set, lower level information will not be output.
+// Postcondition:
+    // 1. All good: return ALL_GOOD, and set the log stream.
+    // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
+    // 3. Open log error: E_LOG_OPEN.
+
+
+
+/*****  Network Layer   *****/
+
+
+/*****  Datalink Layer   *****/
+
+Status sender_datalink_layer(DProtocol protocol, int *pipe);
+
+Status sender_datalink_layer_test(int *pipe);
+
+Status sender_datalink_layer_utopia(int *pipe);
+//function:
+//      sender datalink layer in protocol utopia
+//precondition:
+//      packets are of 1024 bytes already (last bytes != '\0')
+//postcondition:
+        // 1.E_PIPE_READ        pipe read error when fetch data from Network Layer
+        // 2.E_PIPE_INIT        pipe init error
+        // 3.E_FORK             error when forking SPL process
+        // 4.TRANSMISSION_END   transimission end(returned by SPL)
+        // 5.ALL_GOOD           no error
+        // 6.other Error returns from function: sender_physical_layer
+
+
+Status from_network_layer(packet *p, int *pipe);
+//function:
+//      SDL gets packet from SNL
+//precondition：
+//      packets are of 1024 bytes already (last bytes != '\0')
+//postcondition:
+        // 1.E_PIPE_READ        pipe read error when fetch data from Network Layer
+        // 2.ALL_GOOD           no error
+
+
+Status to_physical_layer(frame *s);
+//function:
+//      SDL send packet to SPL
+//precondition:
+//      send frame is ready
+//postcondition:
+        // 1.E_PIPE_INIT        pipe init error
+        // 2.E_FORK             error when forking SPL process
+        // 3.TRANSMISSION_END   transimission end(returned by SPL)
+        // 4.ALL_GOOD           no error
+        // 5.other Error returns from function: sender_physical_layer
+
+
+void enable_network_layer(void);
+//function:
+//      enable network layer -> enable new network_layer_ready event
+
+
+/*****  Physical Layer   *****/
+
 int tcp_server_block(const int port = 20350);
 // Intro: Initialization of a block TCP server.
 // Function: Initialize a TCP block server socket, and accept peer connection.
@@ -89,12 +159,6 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 4. Peer disconnected: return E_PEER_DISCONNECTED.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
-Status sender_datalink_layer(DProtocol protocol, int *pipe);
-
-Status sender_datalink_layer_test(int *pipe);
-
-Status sender_datalink_layer_utopia(int *pipe);
-
 Status sender_physical_layer(int *pipe);
 
 Status receiver_datalink_layer(DProtocol protocol);
@@ -102,16 +166,3 @@ Status receiver_datalink_layer(DProtocol protocol);
 Status receiver_datalink_layer_utopia(int *pipe);
 
 Status receiver_physical_layer(int *pipe);
-
-Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level = Debug);
-// Intro: Initialize logger with given log name and log level.
-// Caution: when return, it's good to close the stream.
-// Function: Initialize logger with given log name and log level, and set log_stream.
-// Precondition:
-    // 1. Log stream.
-    // 2. Log name.
-    // 3. Log level, default the lowest 'Debug'. If higher level is set, lower level information will not be output.
-// Postcondition:
-    // 1. All good: return ALL_GOOD, and set the log stream.
-    // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
-    // 3. Open log error: E_LOG_OPEN.
