@@ -1,10 +1,16 @@
 #include "../common/shared_library.hpp"
 
 int main() {
+    std::ofstream log_stream;
+    if(log_init(log_stream, "receiver_physical_test.log", Info) < 0) {
+        cout << "Open log error!" << endl;
+        return E_LOG_OPEN;
+    }
+
     int server_fd = tcp_server_block();
-    cout << "DEBUG: server_fd\t" << server_fd << endl;
+    LOG(Debug) << "server_fd\t" << server_fd << endl;
     if (server_fd < 0) {
-        cout << "DEBUG: An error occured!" << endl;
+        LOG(Error) << "An error occured!" << endl;
         exit(-1);
     }
 
@@ -13,35 +19,36 @@ int main() {
     // receive 12 bytes.
     char test[LEN_PKG_NODATA] = {0};
     val_physical_layer_recv = physical_layer_recv(server_fd, test, false);
-    cout << "DEBUG: val_physical_layer_recv\t" << val_physical_layer_recv << endl;
+    LOG(Debug) << "val_physical_layer_recv\t" << val_physical_layer_recv << endl;
 
     if (val_physical_layer_recv < 0) {
-        cout << "DEBUG: An error occured!" << endl;
+        LOG(Error) << "An error occured!" << endl;
         exit(-1);
     }
     else {
-        cout << "recv: " << test << " success" << endl;
+        LOG(Info) << "recv: " << test << " success" << endl;
     }
 
     // receive 1036 bytes.
     while (val_physical_layer_recv != TRANSMISSION_END) {
         char test[LEN_PKG_DATA] = {0};
         val_physical_layer_recv = physical_layer_recv(server_fd, test);
-        cout << "DEBUG: val_physical_layer_recv\t" << val_physical_layer_recv << endl;
+        LOG(Debug) << "val_physical_layer_recv\t" << val_physical_layer_recv << endl;
         if (val_physical_layer_recv == TRANSMISSION_END) {
-            cout << "DEBUG: transmission end" << endl;
+            LOG(Info) << "transmission end" << endl;
             break;
         }
 
         if (val_physical_layer_recv < 0) {
-            cout << "DEBUG: An error occured!" << endl;
+            LOG(Error) << "An error occured!" << endl;
             exit(-1);
         }
         else {
-            cout << "recv: " << test << " success" << endl;
+            LOG(Info) << "recv: " << test << " success" << endl;
         }
     }
 
-    cout << endl << "receiver_physical_layer test passed!" << endl;
+    LOG(Info) << endl << "receiver_physical_layer test passed!" << endl;
+    log_stream.close();
     return 0;
 } 

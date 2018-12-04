@@ -3,19 +3,24 @@
 #include <string>
 
 #include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h>
 #include <unistd.h>
 
-#include <netinet/in.h> 
-#include <sys/socket.h> 
 #include <arpa/inet.h>
+#include <netinet/in.h> 
+#include <sys/prctl.h>
+#include <sys/socket.h> 
 
 #include "status.hpp"
 #include "shared_conf.hpp"
+#include "Log.h"
 
 using namespace std;
+using namespace fly;
 
 // gracefully perror and exit
 inline void graceful(const char *s, int x) { perror(s); exit(x); }
@@ -23,6 +28,7 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
 // gracefully perror and return
 #define graceful_return(s, x) {\
     perror((s));\
+    LOG((Error)) << s << endl;\
     return((x)); }
 
 int tcp_server_block(const int port = 20350);
@@ -82,3 +88,30 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 3. Recv error: return E_RECV.
     // 4. Peer disconnected: return E_PEER_DISCONNECTED.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
+
+Status sender_datalink_layer(DProtocol protocol, int *pipe);
+
+Status sender_datalink_layer_test(int *pipe);
+
+Status sender_datalink_layer_utopia(int *pipe);
+
+Status sender_physical_layer(int *pipe);
+
+Status receiver_datalink_layer(DProtocol protocol);
+
+Status receiver_datalink_layer_utopia(int *pipe);
+
+Status receiver_physical_layer(int *pipe);
+
+Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level = Debug);
+// Intro: Initialize logger with given log name and log level.
+// Caution: when return, it's good to close the stream.
+// Function: Initialize logger with given log name and log level, and set log_stream.
+// Precondition:
+    // 1. Log stream.
+    // 2. Log name.
+    // 3. Log level, default the lowest 'Debug'. If higher level is set, lower level information will not be output.
+// Postcondition:
+    // 1. All good: return ALL_GOOD, and set the log stream.
+    // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
+    // 3. Open log error: E_LOG_OPEN.
