@@ -32,10 +32,40 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
     return((x)); }
 
 
+// Datalink layer protocols
+enum DProtocol{
+    test = 0,
+    utopia = 1,
+    simplex_stop_and_wait = 2,
+    noisy_stop_and_wait = 3,
+    one_bit_sliding = 4,
+    back_n = 5,
+    selective_repeat = 6
+};
+
+// Pipe read and pipe write.
+enum Pipe_RW{
+    p_read = 0,
+    p_write = 1
+};
+
+typedef enum {
+    frame_arrival,
+    cksum_err,
+    timeout,
+    network_layer_ready,
+    ack_timeout
+}event_type;
+
+typedef enum {
+    data,
+    ack,
+    nak
+}frame_kind;  //frame types: data/ack/nak
+
 struct packet{
     unsigned char data[RAW_DATA_SIZE] = {0};
 };
-
 
 struct frame{
     frame_kind kind;
@@ -44,6 +74,12 @@ struct frame{
     packet     info;
 };
 
+extern bool sig_cksum_err;
+extern bool sig_frame_arrival;
+extern bool sig_network_layer_ready;
+extern bool sig_enable_network_layer;
+extern bool sig_timeout;
+extern bool sig_ack_timeout;
 
 /*****************************/
 /*****  Network Layer   ******/
@@ -69,7 +105,7 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
 /*****************************/
 void Handler_SIGFRARV(int sig);
 
-void wait_for_event(event_type event);
+void wait_for_event(event_type &event);
 
 void enable_network_layer(void);
 //function:
@@ -88,7 +124,7 @@ Status to_network_layer(packet *p, int *pipe);
 //function:
 //      RDL send packet to RNL
 
-Status from_physical_layer(frame *s);
+Status from_physical_layer(frame *s, int *pipe);
 //function:
 //      RDL gets frame from RPL
 
@@ -145,7 +181,8 @@ int tcp_server_block(const int port = 20350);
     // 5. Listen error: return E_LISTEN.
     // 6. Accept error: return E_ACCEPT.
 
-int tcp_client_block(const char *ip = "0.0.0.0", const int port = 20350);
+//int tcp_client_block(const char *ip = "0.0.0.0", const int port = 20350);
+int tcp_client_block(const char *ip = "192.168.80.231", const int port = 20350);
 // Intro: Initialization of a block TCP client.
 // Function: Initialize a TCP block client socket, and accept peer connection.
 // Precondition:

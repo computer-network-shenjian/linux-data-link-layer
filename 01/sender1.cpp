@@ -28,7 +28,7 @@ int main() {
     }
     else if (datalink_pid == 0) {
         LOG(Info) << "SDL start" << endl;
-        Status val_datalink = sender_datalink_layer(test, pipe_network_datalink);
+        Status val_datalink = sender_datalink_layer(utopia, pipe_network_datalink);
         if (val_datalink < 0) {
             LOG(Error) << "Error occured in SDL with code: " << val_datalink << endl;
             return val_datalink;
