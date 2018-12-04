@@ -1,5 +1,11 @@
 // Configurations for shared libraries.
 
+#define 	SIGCKERR	SIGRTMIN+1  //cksum_err
+#define 	SIGFRARV	SIGRTMIN+2	//frame_arrival
+#define 	SIGNLREADY	SIGRTMIN+3	//network_layer_ready
+#define 	SIGENANL	SIGRTMIN+4	//enable_network_layer
+#define 	SIGDISNL	SIGRTMIN+5	//disble_network_layer
+
 
 const unsigned int	LEN_PKG_DATA 	= 1036;
 const unsigned int	LEN_PKG_NODATA 	= 12;
