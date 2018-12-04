@@ -6,9 +6,7 @@ const unsigned int	LEN_PKG_NODATA 	= 12;
 
 const unsigned int 	TCP_LISTEN_NUM 	= 10;
 
-const		   int 	data_size 		= 1024;
-
-const unsigned int TCP_LISTEN_NUM = 10;
+const unsigned int 	RAW_DATA_SIZE 	= 1024;
 
 const char all_zero[LEN_PKG_DATA] = {0};
 
