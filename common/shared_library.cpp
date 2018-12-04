@@ -1,5 +1,19 @@
 #include "shared_library.hpp"
 
+Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level) {
+    // log_stream must not be opened before getting into this function.
+    if (log_stream.is_open()) {
+        return E_LOG_OPEN;
+    }
+    log_stream.open(log_name, ios::out|ios::trunc);
+    if (!log_stream.is_open()) {
+        return E_LOG_OPEN;
+    }
+    Log::get().setLogStream(log_stream);
+    Log::get().setLevel(level);
+    return ALL_GOOD;
+}
+
 int tcp_server_block(const int port) {
     // AF_INET: IPv4 protocol
 	// SOCK_STREAM: TCP protocol
@@ -69,7 +83,10 @@ Status physical_layer_send(const int socket, const char *buf_send, const bool is
     bool is_data_confirm = is_data | is_end;    // if is_end == true, is_data_confirm must be true.
     const unsigned int buf_length = is_data_confirm ? LEN_PKG_DATA : LEN_PKG_NODATA;
     char buffer[LEN_PKG_DATA] = {0};
-    if (!is_end) {
+    if (is_end) {
+        memcpy(buffer, buf_send, LEN_PKG_NODATA);
+    }
+    else {
         memcpy(buffer, buf_send, buf_length);
     }
     unsigned int total_send = 0;
@@ -161,16 +178,85 @@ Status sender_datalink_layer_test(int *pipe) {
     return ALL_GOOD;
 }
 
-Status log_init(std::ofstream &log_stream, const std::string log_name, const Level level) {
-    // log_stream must not be opened before getting into this function.
-    if (log_stream.is_open()) {
-        return E_LOG_OPEN;
+Status sender_physical_layer(int *pipe) {
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    int client_fd = tcp_client_block();
+    LOG(Debug) << "client_fd\t" << client_fd << endl;
+    if (client_fd < 0) {
+        LOG(Error) << "An error occured when initializing TCP client socoket or connect with error code: " << client_fd << endl;
+        return client_fd;
     }
-    log_stream.open(log_name, ios::out|ios::trunc);
-    if (!log_stream.is_open()) {
-        return E_LOG_OPEN;
+
+    close(pipe[p_write]);
+
+    while(1) {
+        char buffer[LEN_PKG_DATA] = {0};
+        if (read(pipe[p_read], buffer, LEN_PKG_DATA) <= 0) {
+            LOG(Error) << "Pipe read from SNL to SDL error" << endl;
+            return E_PIPE_READ;
+        }
+        LOG(Info) << "Read package in pipe from SNL success, now send it by TCP" << endl;
+
+        Status val_physical_layer_send;
+
+        if (0 == memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE)) {
+            LOG(Info) << "Transmission end, detected by SPL" << endl;
+            val_physical_layer_send = physical_layer_send(client_fd, buffer, true, true);
+            LOG(Debug) << "val_physical_layer_send\t" << val_physical_layer_send << endl;
+            if (val_physical_layer_send < 0) {
+                LOG(Error) << "An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
+                return val_physical_layer_send;
+            }
+            close(pipe[p_read]);
+            // THINK: can client_fd be closed here?
+            close(client_fd);
+            return TRANSMISSION_END;
+        }
+        else {
+            val_physical_layer_send = physical_layer_send(client_fd, buffer);
+            LOG(Debug) << "val_physical_layer_send\t" << val_physical_layer_send << endl;
+            if (val_physical_layer_send < 0) {
+                LOG(Error) << "An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
+                return val_physical_layer_send;
+            }
+        }
     }
-    Log::get().setLogStream(log_stream);
-    Log::get().setLevel(level);
-    return ALL_GOOD;
+}
+
+Status receiver_physical_layer(int *pipe) {
+    int server_fd = tcp_server_block();
+    LOG(Debug) << "server_fd\t" << server_fd << endl;
+    if (server_fd < 0) {
+        LOG(Error) << "An error occured when initializing TCP server socoket or connect with error code: " << server_fd << endl;
+        return server_fd;
+    }
+
+    close(pipe[p_read]);
+    Status val_physical_layer_recv;
+
+    while(1) {
+        char buffer[LEN_PKG_DATA] = {0};
+
+        val_physical_layer_recv = physical_layer_recv(server_fd, buffer);
+        LOG(Debug) << "val_physical_layer_recv\t" << val_physical_layer_recv << endl;
+        if (val_physical_layer_recv == TRANSMISSION_END) {
+            LOG(Info) << "Transmission end, detected by RPL" << endl;
+            close(pipe[p_write]);
+            // THINK: can server_fd be closed here?
+            close(server_fd);
+            return TRANSMISSION_END;
+        }
+
+        if (val_physical_layer_recv < 0) {
+            LOG(Error) << "An error occured with val_physical_layer_recv code: " << val_physical_layer_recv << endl;
+            return val_physical_layer_recv;
+        }
+        else {
+            if (write(pipe[p_write], buffer, LEN_PKG_DATA) < 0) {
+                LOG(Error) << "Pipe write from RPL to RDL error" << endl;
+                return E_PIPE_WRITE;
+            }
+            kill(getppid(), SIGFRARV);
+        }
+    }
 }
