@@ -51,7 +51,7 @@ int main() {
         LOG(Info) << "send test3: " << test3 << " success" << endl;
     }
 
-    val_physical_layer_send = physical_layer_send(client_fd, NULL, true, true);
+    val_physical_layer_send = physical_layer_send(client_fd, test3, true, true);
     LOG(Debug) << "val_physical_layer_send\t" << val_physical_layer_send << endl;
     if (val_physical_layer_send < 0) {
         LOG(Error) << "An error occured!" << endl;
