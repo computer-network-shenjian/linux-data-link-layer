@@ -19,3 +19,8 @@ const int E_SEND = -8;
 const int E_PEER_DISCONNECTED = -9;
 const int E_WRONG_BYTE = -10;
 const int E_RECV = -11;
+
+const int E_READ 	= 	-12;
+const int E_WRITE 	= 	-13;
+const int E_PIPE    =   -14;
+const int E_FORK    =   -15;
