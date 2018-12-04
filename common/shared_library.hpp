@@ -127,6 +127,9 @@ Status sender_datalink_layer_utopia(int *pipe);
         // 5.ALL_GOOD           no error
         // 6.other Error returns from function: sender_physical_layer
 
+Status receiver_datalink_layer(DProtocol protocol);
+
+Status receiver_datalink_layer_utopia(int *pipe);
 
 Status receiver_datalink_layer(DProtocol protocol, int *pipe);
 
