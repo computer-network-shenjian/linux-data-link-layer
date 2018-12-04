@@ -31,11 +31,20 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
     LOG((Error)) << s << endl;\
     return((x)); }
 
+// #define  MAX_SEQ     7
+// #define inc(k) if(k<MAX_SEQ) k++; else k=0;
+
+typedef unsigned int seq_nr;    //send seq
 
 struct packet{
     unsigned char data[RAW_DATA_SIZE] = {0};
 };
 
+typedef enum {
+    data,
+    ack,
+    nak
+}frame_kind;  //frame types: data/ack/nak
 
 struct frame{
     frame_kind kind;
@@ -67,10 +76,6 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
 /*****************************/
 /*****  Datalink Layer   *****/
 /*****************************/
-void Handler_SIGFRARV(int sig);
-
-void wait_for_event(event_type event);
-
 void enable_network_layer(void);
 //function:
 //      enable network layer -> enable new network_layer_ready event
@@ -104,6 +109,7 @@ Status to_physical_layer(frame *s);
         // 4.ALL_GOOD           no error
         // 5.other Error returns from function: sender_physical_layer
 
+
 Status sender_datalink_layer_test(int *pipe);
 
 Status sender_datalink_layer(DProtocol protocol, int *pipe);
@@ -127,6 +133,7 @@ Status receiver_datalink_layer_utopia(int *pipe);
 
 Status receiver_datalink_layer(DProtocol protocol, int *pipe);
 
+Status receiver_datalink_layer_utopia(int *pipe);
 
 
 

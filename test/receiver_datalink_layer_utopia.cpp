@@ -4,6 +4,9 @@
 using namespace std;
 
 
+typedef enum{
+frame_arrival
+}event_type;
 
 void Handler_SIGFRARV(int sig)
 {
@@ -21,58 +24,27 @@ Status receiver_datalink_layer_utopia(int *pipe)
 
 	while(true){
 		wait_for_event(&event);
-		switch(event)
-		{
-			case(frame_arrival):{
-				P_rtn = from_physical_layer(&r);
-				if(P_rtn < 0)
-					return P_rtn;
 
-				N_rtn = to_network_layer(&r.info, pipe);
-				if(N_rtn < 0)
-					return N_rtn;
-				else if(P_rtn == TRANSMISSION_END)
-					return TRANSMISSION_END;
-				else
-					return ALL_GOOD;
-			}
-			default:
-				continue;
-		}
+		P_rtn = from_physical_layer(&r);
+		if(P_rtn < 0)
+			return P_rtn;
+
+		N_rtn = to_network_layer(&r.info, pipe);
+		if(N_rtn < 0)
+			return N_rtn;
+		else if(P_rtn == TRANSMISSION_END)
+			return TRANSMISSION_END;
+		else
+			return ALL_GOOD;
 	}
 }
 
 void wait_for_event(event_type event)
 {
-	while(true){
-		if(sig_frame_arrival){
-			sig_frame_arrival = false;
-			event = frame_arrival;
-			break;
-		}	
-		if(sig_cksum_err){
-			sig_cksum_err = false;
-			event = cksum_err;
-			break;
-		}
-		if(sig_timeout){
-			sig_timeout = false;
-			event = timeout;
-			break;
-		}
-		if(sig_network_layer_ready){
-			sig_network_layer_ready = false;
-			event = network_layer_ready;
-			break;
-		}
-		if(sig_ack_timeout){
-			sig_ack_timeout = false;
-			event = ack_timeout;
-			break;
-		}
-		else
-			continue;
-	}
+	while(!sig_frame_arrival)
+		;
+	sig_frame_arrival = false;
+	event = frame_arrival;
 	return;
 }
 
