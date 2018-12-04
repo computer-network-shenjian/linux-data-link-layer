@@ -21,6 +21,12 @@ const int E_WRONG_BYTE = -10;
 const int E_RECV = -11;
 
 
+const int E_READ 	= 	-12;
+const int E_WRITE 	= 	-13;
+const int E_PIPE    =   -14;
+const int E_FORK    =   -15;
+
+
 const int E_LOG_ISOPENED = -20;
 const int E_LOG_OPEN = -21;
 const int E_PIPE_INIT = -22;
@@ -28,3 +34,4 @@ const int E_FORK = -23;
 const int E_DATALINK_SELECT = -24;
 const int E_PIPE_READ = -25;
 const int E_PIPE_WRITE = -26;
+
