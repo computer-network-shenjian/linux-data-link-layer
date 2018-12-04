@@ -3,17 +3,21 @@
 #include <string>
 
 #include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h>
 #include <unistd.h>
 
-#include <netinet/in.h> 
-#include <sys/socket.h> 
 #include <arpa/inet.h>
+#include <netinet/in.h> 
+#include <sys/prctl.h>
+#include <sys/socket.h> 
 
 #include "status.hpp"
 #include "shared_conf.hpp"
+#include "Log.h"
 
 using namespace std;
 
@@ -82,3 +86,15 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 3. Recv error: return E_RECV.
     // 4. Peer disconnected: return E_PEER_DISCONNECTED.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
+
+Status sender_datalink_layer(const int type);
+
+Status sender_datalink_layer_utopia();
+
+Status sender_physical_layer();
+
+Status receiver_datalink_layer(const int type);
+
+Status receiver_datalink_layer_utopia();
+
+Status receiver_physical_layer();
