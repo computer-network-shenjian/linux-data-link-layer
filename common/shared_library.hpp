@@ -119,6 +119,9 @@ void enable_network_layer(void);
 //function:
 //      enable network layer -> enable new network_layer_ready event
 
+Status receiver_datalink_layer(DProtocol protocol);
+
+Status receiver_datalink_layer_utopia(int *pipe);
 
 /*****  Physical Layer   *****/
 
@@ -181,9 +184,5 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
 Status sender_physical_layer(int *pipe);
-
-Status receiver_datalink_layer(DProtocol protocol);
-
-Status receiver_datalink_layer_utopia(int *pipe);
 
 Status receiver_physical_layer(int *pipe);
