@@ -2,7 +2,7 @@
 
 int main() {
     std::ofstream log_stream;
-    if(log_init(log_stream, "receiver_physical_test.log", Info) < 0) {
+    if(log_init(log_stream, "receiver_physical_test.log") < 0) {
         cout << "Open log error!" << endl;
         return E_LOG_OPEN;
     }
@@ -35,6 +35,7 @@ int main() {
         val_physical_layer_recv = physical_layer_recv(server_fd, test);
         LOG(Debug) << "val_physical_layer_recv\t" << val_physical_layer_recv << endl;
         if (val_physical_layer_recv == TRANSMISSION_END) {
+            LOG(Info) << "recv: " << test << " success" << endl;
             LOG(Info) << "transmission end" << endl;
             break;
         }

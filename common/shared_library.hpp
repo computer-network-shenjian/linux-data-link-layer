@@ -111,7 +111,7 @@ void enable_network_layer(void);
 //function:
 //      enable network layer -> enable new network_layer_ready event
 
-Status from_network_layer(packet *p, int *pipe);
+Status from_network_layer(packet *p, int *pipefd);
 //function:
 //      SDL gets packet from SNL
 //precondition:
@@ -120,11 +120,11 @@ Status from_network_layer(packet *p, int *pipe);
         // 1.E_PIPE_READ        pipe read error when fetch data from Network Layer
         // 2.ALL_GOOD           no error
 
-Status to_network_layer(packet *p, int *pipe);
+Status to_network_layer(packet *p, int *pipefd);
 //function:
 //      RDL send packet to RNL
 
-Status from_physical_layer(frame *s, int *pipe);
+Status from_physical_layer(frame *s, int *pipefd);
 //function:
 //      RDL gets frame from RPL
 
@@ -140,11 +140,11 @@ Status to_physical_layer(frame *s);
         // 4.ALL_GOOD           no error
         // 5.other Error returns from function: sender_physical_layer
 
-Status sender_datalink_layer_test(int *pipe);
+Status sender_datalink_layer_test(int *pipefd);
 
-Status sender_datalink_layer(DProtocol protocol, int *pipe);
+Status sender_datalink_layer(DProtocol protocol, int *pipefd);
 
-Status sender_datalink_layer_utopia(int *pipe);
+Status sender_datalink_layer_utopia(int *pipefd);
 //function:
 //      sender datalink layer in protocol utopia
 //precondition:
@@ -159,9 +159,9 @@ Status sender_datalink_layer_utopia(int *pipe);
 
 Status receiver_datalink_layer(DProtocol protocol);
 
-Status receiver_datalink_layer_utopia(int *pipe);
+Status receiver_datalink_layer_utopia(int *pipefd);
 
-Status receiver_datalink_layer(DProtocol protocol, int *pipe);
+Status receiver_datalink_layer(DProtocol protocol, int *pipefd);
 
 
 
@@ -181,8 +181,8 @@ int tcp_server_block(const int port = 20350);
     // 5. Listen error: return E_LISTEN.
     // 6. Accept error: return E_ACCEPT.
 
-//int tcp_client_block(const char *ip = "0.0.0.0", const int port = 20350);
-int tcp_client_block(const char *ip = "192.168.80.231", const int port = 20350);
+int tcp_client_block(const char *ip = "0.0.0.0", const int port = 20350);
+//int tcp_client_block(const char *ip = "192.168.80.231", const int port = 20350);
 // Intro: Initialization of a block TCP client.
 // Function: Initialize a TCP block client socket, and accept peer connection.
 // Precondition:
@@ -228,7 +228,7 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 4. Peer disconnected: return E_PEER_DISCONNECTED.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
-Status sender_physical_layer(int *pipe);
+Status sender_physical_layer(int *pipefd);
 // Intro: SPL, get data from SDL in pipe, and send it to RPL by TCP block socket.
 // Function:
     // 1. Open a TCP client socket.
@@ -237,7 +237,7 @@ Status sender_physical_layer(int *pipe);
 // Precondition: pipe.
 // Postcondition: status number.
 
-Status receiver_physical_layer(int *pipe);
+Status receiver_physical_layer(int *pipefd);
 // Intro: RPL, receive data from SPL by TCP block socket, and send it to RDL in pipe.
 // Function:
     // 1. Open a TCP server socket.

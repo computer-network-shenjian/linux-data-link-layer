@@ -434,7 +434,7 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
         return TRANSMISSION_END;
     }
     */
-    if (0 == memcmp(all_zero, buffer, LEN_PKG_DATA)) {
+    if (0 == memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE) && is_data) {
         return TRANSMISSION_END;
     }
     else {

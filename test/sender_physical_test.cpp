@@ -2,7 +2,7 @@
 
 int main() {
     std::ofstream log_stream;
-    if(log_init(log_stream, "sender_physical_test.log", Info) < 0) {
+    if(log_init(log_stream, "sender_physical_test.log") < 0) {
         cout << "Open log error!" << endl;
         return E_LOG_OPEN;
     }
