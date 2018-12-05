@@ -14,6 +14,7 @@
 #include <netinet/in.h> 
 #include <sys/prctl.h>
 #include <sys/socket.h> 
+#include <sys/wait.h>
 
 #include "status.hpp"
 #include "shared_conf.hpp"
@@ -31,20 +32,41 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
     LOG((Error)) << s << endl;\
     return((x)); }
 
-// #define  MAX_SEQ     7
-// #define inc(k) if(k<MAX_SEQ) k++; else k=0;
 
-typedef unsigned int seq_nr;    //send seq
-
-struct packet{
-    unsigned char data[RAW_DATA_SIZE] = {0};
+// Datalink layer protocols
+enum DProtocol{
+    test = 0,
+    utopia = 1,
+    simple_stop_and_wait = 2,
+    noisy_stop_and_wait = 3,
+    one_bit_sliding = 4,
+    back_n = 5,
+    selective_repeat = 6
 };
+
+// Pipe read and pipe write.
+enum Pipe_RW{
+    p_read = 0,
+    p_write = 1
+};
+
+typedef enum {
+    frame_arrival,
+    cksum_err,
+    timeout,
+    network_layer_ready,
+    ack_timeout
+}event_type;
 
 typedef enum {
     data,
     ack,
     nak
 }frame_kind;  //frame types: data/ack/nak
+
+struct packet{
+    unsigned char data[RAW_DATA_SIZE] = {0};
+};
 
 struct frame{
     frame_kind kind;
@@ -53,6 +75,12 @@ struct frame{
     packet     info;
 };
 
+extern bool sig_cksum_err;
+extern bool sig_frame_arrival;
+extern bool sig_network_layer_ready;
+extern bool sig_enable_network_layer;
+extern bool sig_timeout;
+extern bool sig_ack_timeout;
 
 /*****************************/
 /*****  Network Layer   ******/
@@ -70,17 +98,22 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
     // 3. Open log error: E_LOG_OPEN.
 
+Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid);
 
-
+Status receiver_network_layer_test(int *pipefd);
 
 /*****************************/
 /*****  Datalink Layer   *****/
 /*****************************/
+void Handler_SIGFRARV(int sig);
+
+void wait_for_event(event_type &event);
+
 void enable_network_layer(void);
 //function:
 //      enable network layer -> enable new network_layer_ready event
 
-Status from_network_layer(packet *p, int *pipe);
+Status from_network_layer(packet *p, int *pipefd);
 //function:
 //      SDL gets packet from SNL
 //precondition:
@@ -89,15 +122,15 @@ Status from_network_layer(packet *p, int *pipe);
         // 1.E_PIPE_READ        pipe read error when fetch data from Network Layer
         // 2.ALL_GOOD           no error
 
-Status to_network_layer(packet *p, int *pipe);
+Status to_network_layer(packet *p, int *pipefd);
 //function:
 //      RDL send packet to RNL
 
-Status from_physical_layer(frame *s);
+Status from_physical_layer(frame *s, int *pipefd);
 //function:
 //      RDL gets frame from RPL
 
-Status to_physical_layer(frame *s);
+Status to_physical_layer(frame *s, int *pipefd);
 //function:
 //      SDL send packet to SPL
 //precondition:
@@ -109,12 +142,11 @@ Status to_physical_layer(frame *s);
         // 4.ALL_GOOD           no error
         // 5.other Error returns from function: sender_physical_layer
 
+Status sender_datalink_layer_test(int *pipefd);
 
-Status sender_datalink_layer_test(int *pipe);
+Status sender_datalink_layer(DProtocol protocol, int *pipefd);
 
-Status sender_datalink_layer(DProtocol protocol, int *pipe);
-
-Status sender_datalink_layer_utopia(int *pipe);
+Status sender_datalink_layer_utopia(int *pipefd);
 //function:
 //      sender datalink layer in protocol utopia
 //precondition:
@@ -127,14 +159,11 @@ Status sender_datalink_layer_utopia(int *pipe);
         // 5.ALL_GOOD           no error
         // 6.other Error returns from function: sender_physical_layer
 
-Status receiver_datalink_layer(DProtocol protocol);
+Status receiver_datalink_layer_utopia(int *pipefd);
 
-Status receiver_datalink_layer_utopia(int *pipe);
+Status receiver_datalink_layer(DProtocol protocol, int *pipefd);
 
-Status receiver_datalink_layer(DProtocol protocol, int *pipe);
-
-Status receiver_datalink_layer_utopia(int *pipe);
-
+Status receiver_datalink_layer_test(int *pipefd);
 
 
 /*****************************/
@@ -153,6 +182,7 @@ int tcp_server_block(const int port = 20350);
     // 6. Accept error: return E_ACCEPT.
 
 int tcp_client_block(const char *ip = "0.0.0.0", const int port = 20350);
+//int tcp_client_block(const char *ip = "192.168.80.231", const int port = 20350);
 // Intro: Initialization of a block TCP client.
 // Function: Initialize a TCP block client socket, and accept peer connection.
 // Precondition:
@@ -174,7 +204,7 @@ Status physical_layer_send(const int socket, const char *buf_send, const bool is
     // 1. Sender's TCP socket, block.
     // 2. Package to send, only first 1036/12 bytes will be processed.
     // 3. Package-is-data indicator, default true. If false, only process 12 bytes.
-    // 4. End indicator, default false. If true, send a 1036-byte package with all '\0', and you can set const char *buf_send as NULL.
+    // 4. End indicator, default false. If true, send a 1036-byte package with all '\0'.
 // Postcondition: status number.
     // 1. Transmission ongoing: return ALL_GOOD.
     // 2. Send error: return E_SEND.
@@ -198,13 +228,20 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 4. Peer disconnected: return E_PEER_DISCONNECTED.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
-Status sender_physical_layer(int *pipe);
-// Intro: SPL, get data from SDL from pipe, and send it to RPL by TCP block socket.
+Status sender_physical_layer(int *pipefd);
+// Intro: SPL, get data from SDL in pipe, and send it to RPL by TCP block socket.
 // Function:
     // 1. Open a TCP client socket.
-    // 2. Loop receive 1036 bytes from SDL from pipe.
+    // 2. Loop receive 1036 bytes from SDL in pipe.
     // 3. Loop send 1036 bytes to RPL by TCP block socket.
 // Precondition: pipe.
 // Postcondition: status number.
 
-Status receiver_physical_layer(int *pipe);
+Status receiver_physical_layer(int *pipefd);
+// Intro: RPL, receive data from SPL by TCP block socket, and send it to RDL in pipe.
+// Function:
+    // 1. Open a TCP server socket.
+    // 2. Loop receive 1036 bytes from SPL by TCP block socket.
+    // 3. Loop send 1036 bytes to RDL in pipe, each with signal SIGFRARV(frame_arrival).
+// Precondition: pipe.
+// Postcondition: status number.

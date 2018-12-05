@@ -2,7 +2,7 @@
 
 int main() {
     std::ofstream log_stream;
-    if(log_init(log_stream, "sender_physical_test.log", Info) < 0) {
+    if(log_init(log_stream, "sender_physical_test.log") < 0) {
         cout << "Open log error!" << endl;
         return E_LOG_OPEN;
     }
@@ -51,7 +51,7 @@ int main() {
         LOG(Info) << "send test3: " << test3 << " success" << endl;
     }
 
-    val_physical_layer_send = physical_layer_send(client_fd, NULL, true, true);
+    val_physical_layer_send = physical_layer_send(client_fd, test3, true, true);
     LOG(Debug) << "val_physical_layer_send\t" << val_physical_layer_send << endl;
     if (val_physical_layer_send < 0) {
         LOG(Error) << "An error occured!" << endl;
