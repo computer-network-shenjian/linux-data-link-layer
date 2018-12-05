@@ -1,21 +1,21 @@
 #include "../common/shared_library.hpp"
 
 int main() {
-	 std::ofstream log_stream;
+	std::ofstream log_stream;
     if(log_init(log_stream, "receiver1.log") < 0) {
-        cout << "Open log error!" << endl;
+        cout << "[RNL] Open log error!" << endl;
         return E_LOG_OPEN;
     }
     
-    LOG(Info) << "RNL start" << endl;
+    LOG(Info) << "[RNL] RNL start" << endl;
 
     int pipe_network_datalink[2];
     if (pipe(pipe_network_datalink) < 0) {
-        LOG(Error) << "pipe_network_datalink init error" << endl;
+        LOG(Error) << "[RNL] pipe_network_datalink init error" << endl;
         return E_PIPE_INIT;
     }
     else {
-        LOG(Info) << "pipe_network_datalink init ok" << endl;
+        LOG(Info) << "[RNL] pipe_network_datalink init ok" << endl;
     }
 
     signal(SIGCHLD, SIG_IGN);
@@ -23,34 +23,33 @@ int main() {
     pid_t datalink_pid = fork();
 
     if (datalink_pid < 0) {
-        LOG(Error) << "fork unsuccessful" << endl;
+        LOG(Error) << "[RNL] fork unsuccessful" << endl;
         return E_FORK;
     }
     else if (datalink_pid == 0) {
-        LOG(Info) << "RDL start" << endl;
-        Status val_datalink = receiver_datalink_layer(utopia, pipe_network_datalink);
+        Status val_datalink = receiver_datalink_layer(test, pipe_network_datalink);
         if (val_datalink < 0) {
-            LOG(Error) << "Error occured in RDL with code: " << val_datalink << endl;
+            LOG(Error) << "[RDL] Error occured in RDL with code: " << val_datalink << endl;
             return val_datalink;
         }
         else {
-            LOG(Info) << "RDL end with success" << endl;
+            LOG(Info) << "[RDL] RDL end with success" << endl;
             return ALL_GOOD;
         }
     }
     else {
-        close(pipe_network_datalink[p_write]);   // write only
-        char pipe_buf[RAW_DATA_SIZE + 1] = {0};
-        if (read(pipe_network_datalink[p_read], pipe_buf, RAW_DATA_SIZE) < 0) {
-            LOG(Error) << "Pipe read from RDL to RNL error" << endl;
-            return E_PIPE_READ;
+        Status val_rnl = receiver_network_layer_test(pipe_network_datalink);
+        LOG(Debug) << "[RNL] val_rnl\t" << val_rnl << endl;
+        if (val_rnl < 0) {
+            LOG(Error) << "[RNL] Error occured in RNL with code: " << val_rnl << endl;
+            log_stream.close();
+            return val_rnl;
         }
-        LOG(Info) << "RNL read from RDL: " << pipe_buf << endl;
-        sleep(1);
-        close(pipe_network_datalink[p_read]);
-        LOG(Info) << "RNL end with success" << endl;
-        log_stream.close();
-        return ALL_GOOD;
+        else {
+            LOG(Info) << "[RNL] RNL end with success" << endl;
+            log_stream.close();
+            return ALL_GOOD;
+        }
     }
     return 0;
 }

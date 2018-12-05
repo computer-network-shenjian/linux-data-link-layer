@@ -37,7 +37,7 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
 enum DProtocol{
     test = 0,
     utopia = 1,
-    simplex_stop_and_wait = 2,
+    simple_stop_and_wait = 2,
     noisy_stop_and_wait = 3,
     one_bit_sliding = 4,
     back_n = 5,
@@ -98,8 +98,9 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
     // 3. Open log error: E_LOG_OPEN.
 
+Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid);
 
-
+Status receiver_network_layer_test(int *pipefd);
 
 /*****************************/
 /*****  Datalink Layer   *****/
@@ -158,13 +159,11 @@ Status sender_datalink_layer_utopia(int *pipefd);
         // 5.ALL_GOOD           no error
         // 6.other Error returns from function: sender_physical_layer
 
-Status receiver_datalink_layer(DProtocol protocol);
-
 Status receiver_datalink_layer_utopia(int *pipefd);
 
 Status receiver_datalink_layer(DProtocol protocol, int *pipefd);
 
-
+Status receiver_datalink_layer_test(int *pipefd);
 
 
 /*****************************/
