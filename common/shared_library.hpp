@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <string>
 
@@ -98,9 +99,16 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
     // 3. Open log error: E_LOG_OPEN.
 
+unsigned int count_ending_zeros(const char * const data, unsigned int data_length = 1024);
+// Intro: count the number of ending zeros of an array from position data_length.
+
 Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid);
 
 Status receiver_network_layer_test(int *pipefd);
+
+Status sender_network_layer(int *pipefd, const pid_t datalink_pid);
+
+Status receiver_network_layer(int *pipefd);
 
 /*****************************/
 /*****  Datalink Layer   *****/
