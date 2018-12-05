@@ -19,5 +19,5 @@ const unsigned int 	TCP_LISTEN_NUM 	= 10;
 
 const unsigned int 	RAW_DATA_SIZE 	= 1024;
 
-const char all_zero[LEN_PKG_DATA] = {0};
+const char all_zero[LEN_PKG_DATA+1] = {0};
 
