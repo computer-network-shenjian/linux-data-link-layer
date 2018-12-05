@@ -26,4 +26,4 @@ const int E_FORK = -15;
 const int E_DATALINK_SELECT = -16;
 const int E_PIPE_READ = -17;
 const int E_PIPE_WRITE = -18;
-
+const int E_OPEN_FILE = -19;

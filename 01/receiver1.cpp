@@ -2,7 +2,7 @@
 
 int main() {
 	std::ofstream log_stream;
-    if(log_init(log_stream, "receiver1.log") < 0) {
+    if(log_init(log_stream, "receiver1.log", Info) < 0) {
         cout << "[RNL] Open log error!" << endl;
         return E_LOG_OPEN;
     }
@@ -41,7 +41,7 @@ int main() {
         */
     }
     else {
-        Status val_rnl = receiver_network_layer_test(pipe_network_datalink);
+        Status val_rnl = receiver_network_layer(pipe_network_datalink);
         LOG(Debug) << "[RNL] val_rnl\t" << val_rnl << endl;
         if (val_rnl < 0) {
             LOG(Error) << "[RNL] Error occured in RNL with code: " << val_rnl << endl;

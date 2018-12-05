@@ -2,7 +2,7 @@
 
 int main() {
     std::ofstream log_stream;
-    if(log_init(log_stream, "sender1.log") < 0) {
+    if(log_init(log_stream, "sender1.log", Info) < 0) {
         cout << "[SNL] Open log error!" << endl;
         return E_LOG_OPEN;
     }
@@ -38,7 +38,7 @@ int main() {
         }
     }
     else {
-        Status val_snl = sender_network_layer_test(pipe_network_datalink, datalink_pid);
+        Status val_snl = sender_network_layer(pipe_network_datalink, datalink_pid);
         LOG(Debug) << "[SNL] val_snl\t" << val_snl << endl;
         if (val_snl < 0) {
             LOG(Error) << "[SNL] Error occured in SNL with code: " << val_snl << endl;
