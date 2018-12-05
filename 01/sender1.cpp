@@ -47,6 +47,8 @@ int main() {
         }
         LOG(Info) << "SNL sent to SDL: " << pipe_buf << endl;
         sleep(1);
+        //int val_waitpid = waitpid(datalink_pid, NULL, 0);
+        //LOG(Debug) << "SNL: val_waitpid\t" << val_waitpid << endl;
         close(pipe_network_datalink[p_write]);
         LOG(Info) << "SNL end with success" << endl;
         log_stream.close();
