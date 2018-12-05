@@ -307,11 +307,16 @@ Status receiver_datalink_layer_test(int *pipefd) {
         }
     }
 
-    LOG(Info) << "[RDL] Transmission end detected" << endl;
+    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death" << endl;
 
     close(pipefd[p_read]);
 
     LOG(Info) << "[RDL] RDL test passed!" << endl;
+
+    while(1) {
+        sleep(1);
+    }
+
     return ALL_GOOD;
 }
 
@@ -683,6 +688,15 @@ Status sender_physical_layer(int *pipefd) {
             // THINK: do we need to sleep here? How long do we need to sleep?
             //sleep(1);
             // THINK: can client_fd be closed here?
+            while(1) {
+                if (0 == send(client_fd, NULL, 0, 0)) {
+                    break;
+                }
+                else {
+                    sleep(1);
+                }
+            }
+            LOG(Info) << "[SPL] peer(RPL) disconnected detected, SPL will end too." << endl;
             close(client_fd);
             return TRANSMISSION_END;
         }
@@ -734,6 +748,10 @@ Status receiver_physical_layer(int *pipefd) {
                 close(pipefd[p_write]);
                 // THINK: can server_fd be closed here?
                 close(server_fd);
+                LOG(Info) << "[RPL] Wait for RDL's death." << endl;
+                while(1) {
+                    sleep(1);
+                }
                 return TRANSMISSION_END;
             }            
         }
