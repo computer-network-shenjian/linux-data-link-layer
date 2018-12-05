@@ -83,9 +83,11 @@ Status receiver_network_layer_test(int *pipefd) {
     return ALL_GOOD;
 }
 
+
 /*****************************/
 /*****  Datalink Layer   *****/
 /*****************************/
+
 void Handler_SIGFRARV(int sig) {
     sig_frame_arrival = 1;
 }
@@ -125,7 +127,6 @@ void wait_for_event(event_type &event) {
 
 Status sender_datalink_layer_test(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-
     LOG(Info) << "[SDL] SDL start" << endl;
 
     int pipe_datalink_physical[2];
@@ -335,6 +336,7 @@ Status sender_datalink_layer_utopia(int *pipefd) {
     //physical layer proc
     else if(phy_pid == 0){
         prctl(PR_SET_PDEATHSIG, SIGHUP);
+
         LOG(Info) << "sender: SPL start."<< endl;
         while(rtn >= 0){
             rtn = sender_physical_layer(pipe_datalink_physical);
@@ -400,20 +402,23 @@ Status receiver_datalink_layer_utopia(int *pipefd) {
 
     //physical layer proc 
     else if(phy_pid == 0){
+        //physical proc exit after datalink proc exit 
+        prctl(PR_SET_PDEATHSIG, SIGHUP);
+
         LOG(Info) << "receiver: SPL start."<< endl;
         while(rtn >= 0){
             rtn = receiver_physical_layer(pipe_physical_datalink);
             
-            if(rtn == TRANSMISSION_END){
-                LOG(Info) << "receiver: Transmission end in SDL." << endl;
-                return rtn;
-            }
-            else if(rtn < 0)
-                LOG(Error) << "receiver: SPL failed, returned error in SDL." << endl;
+            // if(rtn == TRANSMISSION_END){
+            //     LOG(Info) << "receiver: Transmission end in SDL." << endl;
+            //     return rtn;
+            // }
+            if(rtn < 0)
+                LOG(Error) << "receiver: SPL failed, returned error." << endl;
             else    //return ALL_GOOD
                 LOG(Info) << "receiver: SPL end successfully." << endl; 
         }
-        LOG(Info) << "receiver: SPL end." << endl;
+        return rtn;
     }
 
     //datalink layer proc
@@ -461,7 +466,6 @@ Status from_network_layer(packet *p, int *pipefd) {
 }     
 
 Status to_physical_layer(frame *s, int *pipefd) {
-
         char pipe_buf[LEN_PKG_DATA+1];
         memcpy(pipe_buf, &(s->kind), sizeof(int));
         memcpy(pipe_buf+4, &(s->seq), sizeof(int));
