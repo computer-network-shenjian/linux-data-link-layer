@@ -26,6 +26,13 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     return ALL_GOOD;
 }
 
+unsigned int count_ending_zeros(const char * const data, unsigned int data_length) {
+    // count the number of ending zeros of an array from position data_length
+    int counter = data_length;
+    while (counter >= 0 && data[--counter] == 0) {};
+    return data_length - 1 - counter;
+}
+
 Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid) {
     close(pipefd[p_read]);   // write only
 
@@ -83,6 +90,86 @@ Status receiver_network_layer_test(int *pipefd) {
     return ALL_GOOD;
 }
 
+Status sender_network_layer(int *pipefd, const pid_t datalink_pid) {
+    close(pipefd[p_read]);   // write only
+
+    //ifstream in("test.myfile", ios::binary);
+    ifstream in(SEND_FILE, ios::binary);
+    if(!in.is_open()) {
+        LOG(Error) << "Open input file error" << endl;
+        return E_OPEN_FILE;
+    }
+    /*
+    in.seekg(0, in.end);
+    streampos in_length = in.tellg();
+    in.seekg(0, in.beg);
+    LOG(Info) << "Read file OK with file length: " << in_length << endl;
+    */
+    while (!in.eof()) {
+        char pipe_buf[RAW_DATA_SIZE+1] = {0};
+        in.read(pipe_buf, RAW_DATA_SIZE);
+        if (write(pipefd[p_write], pipe_buf, RAW_DATA_SIZE) < 0) {
+            LOG(Error) << "[SNL] Pipe write from SNL to SDL error" << endl;
+            return E_PIPE_WRITE;
+        }        
+    }
+
+    // eof detected, close file and send all zero.
+    in.close();
+    if (write(pipefd[p_write], all_zero, RAW_DATA_SIZE) < 0) {
+        LOG(Error) << "[SNL] Pipe write from SNL to SDL error" << endl;
+        return E_PIPE_WRITE;
+    }
+
+    LOG(Debug) << "[SNL] SNL sent to SDL all zero" << endl;
+
+    int val_waitpid = waitpid(datalink_pid, NULL, 0);
+    LOG(Debug) << "[SNL] val_waitpid\t" << val_waitpid << endl;
+    LOG(Info) << "[SNL] SDL end detected" << endl;
+    close(pipefd[p_write]);
+    
+    return ALL_GOOD;
+}
+
+Status receiver_network_layer(int *pipefd) {
+    close(pipefd[p_write]);   // read only
+
+    //ofstream out("out.myfile", ios::binary|ios::trunc);
+    ofstream out(RECV_FILE, ios::binary|ios::trunc);
+    if(!out.is_open()) {
+        LOG(Error) << "Open output file error" << endl;
+        return E_OPEN_FILE;
+    }
+    char pipe_buf_before[RAW_DATA_SIZE+1] = {0};
+    char pipe_buf_now[RAW_DATA_SIZE+1] = {0};
+    bool is_first = true;
+
+    while(1) {
+        if (read(pipefd[p_read], pipe_buf_now, RAW_DATA_SIZE) < 0) {
+            LOG(Error) << "[RNL] Pipe read from RDL to RNL error" << endl;
+            return E_PIPE_READ;
+        }
+        LOG(Debug) << "[RNL] RNL read from RDL: " << pipe_buf_now << endl;
+
+        if (0 == memcmp(pipe_buf_now, all_zero, RAW_DATA_SIZE)) {
+            unsigned int val_zeros = count_ending_zeros(pipe_buf_before);
+            out.write(pipe_buf_before, RAW_DATA_SIZE-val_zeros);
+            LOG(Info) << "[RNL] Transmission end detected" << endl;
+            out.close();
+            break;
+        }
+        else {
+            if (!is_first) {
+                out.write(pipe_buf_before, RAW_DATA_SIZE);
+            }
+            is_first = false;
+            memcpy(pipe_buf_before, pipe_buf_now, RAW_DATA_SIZE);
+        }
+    }
+
+    close(pipefd[p_read]);
+    return ALL_GOOD;
+}
 
 /*****************************/
 /*****  Datalink Layer   *****/
@@ -308,11 +395,16 @@ Status receiver_datalink_layer_test(int *pipefd) {
         }
     }
 
-    LOG(Info) << "[RDL] Transmission end detected" << endl;
+    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death" << endl;
 
     close(pipefd[p_read]);
 
     LOG(Info) << "[RDL] RDL test passed!" << endl;
+
+    while(1) {
+        sleep(1);
+    }
+
     return ALL_GOOD;
 }
 
@@ -672,7 +764,7 @@ Status sender_physical_layer(int *pipefd) {
             LOG(Error) << "[SPL] Pipe read from SNL to SDL error" << endl;
             return E_PIPE_READ;
         }
-        LOG(Info) << "[SPL] Read info from SNL: " << buffer << endl;
+        LOG(Debug) << "[SPL] Read info from SNL: " << buffer << endl;
 
         Status val_physical_layer_send;
 
@@ -688,6 +780,15 @@ Status sender_physical_layer(int *pipefd) {
             // THINK: do we need to sleep here? How long do we need to sleep?
             //sleep(1);
             // THINK: can client_fd be closed here?
+            while(1) {
+                if (0 == send(client_fd, NULL, 0, 0)) {
+                    break;
+                }
+                else {
+                    sleep(1);
+                }
+            }
+            LOG(Info) << "[SPL] peer(RPL) disconnected detected, SPL will end too." << endl;
             close(client_fd);
             return TRANSMISSION_END;
         }
@@ -739,6 +840,10 @@ Status receiver_physical_layer(int *pipefd) {
                 close(pipefd[p_write]);
                 // THINK: can server_fd be closed here?
                 close(server_fd);
+                LOG(Info) << "[RPL] Wait for RDL's death." << endl;
+                while(1) {
+                    sleep(1);
+                }
                 return TRANSMISSION_END;
             }            
         }
