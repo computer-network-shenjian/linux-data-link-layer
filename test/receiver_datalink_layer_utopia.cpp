@@ -10,65 +10,76 @@ void Handler_SIGFRARV(int sig)
 	sig_frame_arrival = 1;
 }
 
-Status receiver_datalink_layer_utopia(int *pipe){
+Status receiver_datalink_layer_utopia(int *pipefd) {
+    //avoid zonbe proc
+    signal(SIGCHLD, SIG_IGN);
     signal(SIGFRARV, Handler_SIGFRARV);
 
-    Status rtn;
+    Status rtn = ALL_GOOD;
     int pipe_physical_datalink[2];
 
     if(pipe(pipe_physical_datalink) == -1){
         LOG(Error) << "receiver: Pipe INIT error in datalink layer." << endl;
         return E_PIPE_INIT;
     }
-    //avoid zonbe proc
-    signal(SIGCHLD, SIG_IGN);
+
     pid_t phy_pid = fork();
 
     if(phy_pid < 0){
         LOG(Error) << "receiver: SDL fork error." << endl;
         return E_FORK;
     }
+
+    //physical layer proc 
     else if(phy_pid == 0){
+        //physical proc exit after datalink proc exit 
+        prctl(PR_SET_PDEATHSIG, SIGHUP);
+
         LOG(Info) << "receiver: SPL start."<< endl;
-        rtn = receiver_physical_layer(pipe_physical_datalink);
-        
-        if(rtn == TRANSMISSION_END)
-            LOG(Info) << "receiver: Transmission end in SDL." << endl;
-        else if(rtn < 0)
-            LOG(Error) << "receiver: SPL failed, returned error in SDL." << endl;
-        else    //return ALL_GOOD
-            LOG(Info) << "receiver: SPL end successfully." << endl;
+        while(rtn >= 0){
+            rtn = receiver_physical_layer(pipe_physical_datalink);
+            
+            // if(rtn == TRANSMISSION_END){
+            //     LOG(Info) << "receiver: Transmission end in SDL." << endl;
+            //     return rtn;
+            // }
+            if(rtn < 0)
+                LOG(Error) << "receiver: SPL failed, returned error." << endl;
+            else    //return ALL_GOOD
+                LOG(Info) << "receiver: SPL end successfully." << endl; 
+        }
         return rtn;
     }
-    //father
+
+    //datalink layer proc
     else{
-	    close(pipe[p_read]);
-	    frame r;
-	    event_type event;
-	    Status P_rtn, N_rtn;
+        close(pipefd[p_read]);
+        frame r;
+        event_type event;
+        Status P_rtn, N_rtn;
 
-	    while(true){
-	        wait_for_event(event);
-	        switch(event)
-	        {
-	            case(frame_arrival):{
-	                P_rtn = from_physical_layer(&r, pipe_physical_datalink);
-	                if(P_rtn < 0)
-	                    return P_rtn;
+        while(true){
+            while(true){
+                wait_for_event(event);
+                if(event == frame_arrival)
+                    break;
+            }
 
-	                N_rtn = to_network_layer(&r.info, pipe);
-	                if(N_rtn < 0)
-	                    return N_rtn;
-	                else if(P_rtn == TRANSMISSION_END)
-	                    return TRANSMISSION_END;
-	                else
-	                    return ALL_GOOD;
-	            }
-	            default:
-	                continue;
-	        }
-	    }
-	}
+            P_rtn = from_physical_layer(&r, pipe_physical_datalink);
+            if(P_rtn < 0)
+                return P_rtn;
+
+            N_rtn = to_network_layer(&r.info, pipefd);
+            if(N_rtn < 0)
+                return N_rtn;
+            //this must be done afster to_network_layer!!
+            if(P_rtn == TRANSMISSION_END)
+                return TRANSMISSION_END;
+            else
+                continue;
+        }
+    }
+    return ALL_GOOD;
 }
 
 
