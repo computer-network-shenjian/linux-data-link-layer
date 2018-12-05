@@ -129,7 +129,7 @@ Status from_physical_layer(frame *s, int *pipefd);
 //function:
 //      RDL gets frame from RPL
 
-Status to_physical_layer(frame *s);
+Status to_physical_layer(frame *s, int *pipefd);
 //function:
 //      SDL send packet to SPL
 //precondition:

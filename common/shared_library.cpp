@@ -185,6 +185,7 @@ Status sender_datalink_layer_utopia(int *pipefd){
         pid_t wait_pid = waitpid(phy_pid, NULL, 0); //wait for phy_pid exit
         LOG(Debug) << "waitpid: " << wait_pid <<endl;
     }
+    return ALL_GOOD;
 }
 
 Status receiver_datalink_layer_utopia(int *pipefd){
@@ -253,6 +254,7 @@ Status receiver_datalink_layer_utopia(int *pipefd){
                 continue;
         }
     }
+    return ALL_GOOD;
 }
 
 Status from_network_layer(packet *p, int *pipefd){
@@ -268,7 +270,7 @@ Status from_network_layer(packet *p, int *pipefd){
     return ALL_GOOD;
 }     
 
-Status to_physical_layer(frame *s, int pipefd){
+Status to_physical_layer(frame *s, int *pipefd){
 
         char pipe_buf[LEN_PKG_DATA+1];
         memcpy(pipe_buf, &(s->kind), sizeof(int));
