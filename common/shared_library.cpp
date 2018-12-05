@@ -145,6 +145,7 @@ Status sender_datalink_layer_utopia(int *pipefd){
 
     //physical layer proc
     else if(phy_pid == 0){
+        prctl(PR_SET_PDEATHSIG, SIGHUP);
         LOG(Info) << "sender: SPL start."<< endl;
         while(rtn >= 0){
             rtn = sender_physical_layer(pipe_datalink_physical);
