@@ -6,8 +6,8 @@
 #define 	SIGENANL	SIGRTMIN+4	//enable_network_layer
 #define 	SIGDISNL	SIGRTMIN+5	//disble_network_layer
 
-// #define  MAX_SEQ     7
-// #define inc(k) if(k<MAX_SEQ) k++; else k=0;
+#define  MAX_SEQ     7
+#define inc(k) if(k<MAX_SEQ) k++; else k=0;
 
 typedef unsigned int seq_nr;    //send seq
 

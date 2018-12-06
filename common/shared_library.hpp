@@ -110,16 +110,13 @@ Status sender_network_layer(int *pipefd, const pid_t datalink_pid);
 
 Status receiver_network_layer(int *pipefd);
 
+
 /*****************************/
 /*****  Datalink Layer   *****/
 /*****************************/
 void Handler_SIGFRARV(int sig);
 
 void wait_for_event(event_type &event);
-
-void enable_network_layer(void);
-//function:
-//      enable network layer -> enable new network_layer_ready event
 
 Status from_network_layer(packet *p, int *pipefd);
 //function:
@@ -149,6 +146,31 @@ Status to_physical_layer(frame *s, int *pipefd);
         // 3.TRANSMISSION_END   transimission end(returned by SPL)
         // 4.ALL_GOOD           no error
         // 5.other Error returns from function: sender_physical_layer
+
+void start_timer(seq_nr k);
+//function:
+// start timer of frame k
+// implementation: Link List
+
+void stop_timer(seq_nr k);
+//function:
+// stop timer of frame k
+
+void start_ack_timer(void);
+//function:
+// start ACK timer
+
+void stop_ack_timer(void);
+//function:
+// stop ACK timer
+
+void enable_network_layer(void);
+//function:
+// enable network layer -> enable new network_layer_ready event
+
+void disable_network_layer(void);
+//function:
+// disable network layer -> disable new network_layer_ready event
 
 Status sender_datalink_layer_test(int *pipefd);
 
@@ -236,8 +258,10 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data 
     // 4. Peer disconnected: return E_PEER_DISCONNECTED.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
-Status sender_physical_layer(int *pipefd);
+Status sender_physical_layer(int *pipefd_down, int *pipefd_up);
 // Intro: SPL, get data from SDL in pipe, and send it to RPL by TCP block socket.
+//          pipefd_down: dataflow  datalink_layer -> physical_layer
+//          pipefd_up:   dataflow  physical_layer -> datalink_layer
 // Function:
     // 1. Open a TCP client socket.
     // 2. Loop receive 1036 bytes from SDL in pipe.
@@ -245,8 +269,10 @@ Status sender_physical_layer(int *pipefd);
 // Precondition: pipe.
 // Postcondition: status number.
 
-Status receiver_physical_layer(int *pipefd);
+Status receiver_physical_layer(int *pipefd_down, int *pipefd_up);
 // Intro: RPL, receive data from SPL by TCP block socket, and send it to RDL in pipe.
+//          pipefd_down: dataflow  datalink_layer -> physical_layer
+//          pipefd_up:   dataflow  physical_layer -> datalink_layer
 // Function:
     // 1. Open a TCP server socket.
     // 2. Loop receive 1036 bytes from SPL by TCP block socket.
