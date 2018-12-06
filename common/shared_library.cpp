@@ -176,7 +176,8 @@ Status receiver_network_layer(int *pipefd) {
 /*****************************/
 
 void Handler_SIGFRARV(int sig) {
-    sig_frame_arrival ++;
+    if(sig == SIGFRARV)
+        sig_frame_arrival ++;
 }
 
 void wait_for_event(event_type &event) {
