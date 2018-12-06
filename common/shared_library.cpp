@@ -569,6 +569,211 @@ Status receiver_datalink_layer_utopia(int *pipefd) {
     return ALL_GOOD;
 }
 
+Status sender_datalink_layer_StopAndWait(int *pipefd) {
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    signal(SIGFRARV, Handler_SIGFRARV);
+
+    LOG(Info) << "[SDL] SDL start" << endl;
+
+    Status rtn = ALL_GOOD;
+    int pipe_datalink_physical[2];
+    int pipe_physical_datalink[2];
+
+    pid_t phy_pid;
+
+    if(pipe(pipe_datalink_physical) == -1){
+        LOG(Error) << "[SDL] pipe_datalink_physical init error" << endl;
+        return E_PIPE_INIT;
+    }
+    if(pipe(pipe_physical_datalink) == -1){
+        LOG(Error) << "[RDL] pipe_physical_datalink init error" << endl;
+        return E_PIPE_INIT;
+    }
+
+    //set pipe nonblock
+    int nPipeReadFlag = fcntl(pipe_datalink_physical[p_write], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_datalink_physical[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[RDL] pipe_datalink_physical set fcntl error" << endl;
+        E_PIPE_INIT;
+    }
+    
+    nPipeReadFlag = fcntl(pipe_physical_datalink[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_physical_datalink[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[RDL] pipe_physical_datalink set fcntl error" << endl;
+        E_PIPE_INIT;
+    }
+
+    LOG(Info) << "[SDL] pipe init ok" << endl;
+
+    phy_pid = fork();
+    if(phy_pid < 0){
+        LOG(Error) << "[SDL] fork unsuccessful" << endl;
+        return E_FORK;
+    }
+
+    //physical layer proc
+    else if(phy_pid == 0){
+        prctl(PR_SET_PDEATHSIG, SIGHUP);
+        rtn = sender_physical_layer(pipe_datalink_physical, pipe_physical_datalink);
+        if(rtn == TRANSMISSION_END){
+            LOG(Info) << "sender: Transmission end in SDL." << endl;
+            return rtn;
+        }
+        else if(rtn < 0){
+            LOG(Error) << "[SPL] Error occured in SPL with code: " << rtn << endl;
+            return rtn;
+        }
+        else{    //return ALL_GOOD
+            LOG(Info) << "[SPL] SPL end with success" << endl;
+            return ALL_GOOD;
+        }   
+    }//end of else if
+
+    //datalink layer proc
+    else{    
+        //clsoe write port
+        close(pipefd[p_write]);
+        frame s;
+        packet buffer;
+        event_type event;
+
+        //enable_network_layer();
+        while(true){
+            rtn = from_network_layer(&buffer, pipefd);
+            if(rtn == E_PIPE_READ)  
+                return rtn;
+
+            s.info = buffer;
+
+            rtn = to_physical_layer(&s, pipe_datalink_physical);
+            if(rtn == TRANSMISSION_END)
+                break;
+            if(rtn < 0)
+                return rtn;
+
+            while(true){
+                wait_for_event(event);
+                if(event == frame_arrival)
+                    break;
+            }
+        }
+
+        LOG(Info) << "[SDL] Transmission end detected" << endl;
+        close(pipefd[p_read]);
+
+        pid_t wait_pid = waitpid(phy_pid, NULL, 0); //wait for phy_pid exit
+        LOG(Debug) << "[SDL] val_waitpid\t" << wait_pid << endl;
+        LOG(Info) << "[SDL] SPL end detected" << endl;
+    }//end of else
+
+    LOG(Info) << "[SDL] SDL end with success!" << endl;
+    return ALL_GOOD;
+}
+
+Status receiver_datalink_layer_StopAndWait(int *pipefd) {
+    //exit when father proc exit
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    //avoid zonbe proc
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGFRARV, Handler_SIGFRARV);
+
+    LOG(Info) << "[RDL] RDL start" << endl;
+
+    Status rtn = ALL_GOOD;
+    int pipe_physical_datalink[2];
+    int pipe_datalink_physical[2];
+
+    if(pipe(pipe_datalink_physical) == -1){
+        LOG(Error) << "[SDL] pipe_datalink_physical init error" << endl;
+        return E_PIPE_INIT;
+    }
+    if(pipe(pipe_physical_datalink) == -1){
+        LOG(Error) << "[RDL] pipe_physical_datalink init error" << endl;
+        return E_PIPE_INIT;
+    }
+    
+    //set pipe nonblock
+    int nPipeReadFlag = fcntl(pipe_datalink_physical[p_write], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_datalink_physical[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[RDL] pipe_datalink_physical set fcntl error" << endl;
+        E_PIPE_INIT;
+    }
+    
+    nPipeReadFlag = fcntl(pipe_physical_datalink[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_physical_datalink[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[RDL] pipe_physical_datalink set fcntl error" << endl;
+        E_PIPE_INIT;
+    }
+
+    LOG(Info) << "[RDL] pipe init ok" << endl;
+
+    pid_t phy_pid = fork();
+    if(phy_pid < 0){
+        LOG(Error) << "[RDL] fork unsuccessful" << endl;
+        return E_FORK;
+    }
+
+    //physical layer proc 
+    else if(phy_pid == 0){
+        rtn = receiver_physical_layer(pipe_datalink_physical, pipe_physical_datalink);
+        // if(rtn == TRANSMISSION_END){
+        //     LOG(Info) << "receiver: Transmission end in SDL." << endl;
+        //     return rtn;
+        // }
+        if(rtn < 0){
+            LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
+            return rtn;
+        }
+        else {
+            LOG(Info) << "[RPL] SPL end with success" << endl;
+            return ALL_GOOD;
+        } 
+    }
+
+    //datalink layer proc
+    else{
+        close(pipefd[p_read]);
+        frame r;
+        event_type event;
+        Status P_rtn, N_rtn;
+
+        while(true){
+            while(true){
+                wait_for_event(event);
+                if(event == frame_arrival)
+                    break;
+            }
+
+            P_rtn = from_physical_layer(&r, pipe_physical_datalink);
+            if(P_rtn < 0)
+                return P_rtn;
+
+            N_rtn = to_network_layer(&r.info, pipefd);
+            if(N_rtn < 0)
+                return N_rtn;
+            //this must be done afster to_network_layer!!
+            if(P_rtn == TRANSMISSION_END)
+                return TRANSMISSION_END;
+            if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
+        }
+    }
+    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death" << endl;
+    close(pipefd[p_write]);
+
+    LOG(Info) << "[RDL] RDL test passed!" << endl;
+
+    while(1){
+        sleep(1);
+    }
+    return ALL_GOOD;
+}
+
 Status from_network_layer(packet *p, int *pipefd){
     char pipe_buf[RAW_DATA_SIZE + 1];
     //p_write closed in upper function
@@ -594,9 +799,13 @@ Status to_physical_layer(frame *s, int *pipefd) {
             LOG(Error) << "[SDL] write to SPL error." << endl;
             return E_PIPE_WRITE;
         }
-
         LOG(Info) << "[SDL] sent frame to SPL successfully." << endl;
-        return ALL_GOOD;
+
+        if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
+            return TRANSMISSION_END;
+        }
+        else
+            return ALL_GOOD;
 }
 
 Status to_network_layer(packet *p, int *pipefd) {
@@ -624,7 +833,7 @@ Status from_physical_layer(frame *s, int *pipefd) {
 
     LOG(Info) << "[RDL] read frame from SPL successfully." << endl;
     return ALL_GOOD;
-}    
+}     
 
 
 //not used in Utopia
@@ -649,6 +858,51 @@ int tcp_server_block(const int port) {
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) { 
         graceful_return("setsockopt", E_SETSOCKOPT);
     }
+
+    struct sockaddr_in server_addr; 
+    server_addr.sin_family = AF_INET; 
+    // INADDR_ANY means 0.0.0.0(localhost), or all IP of local machine.
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port); 
+    int server_addrlen = sizeof(server_addr);
+    if (bind(server_fd, (struct sockaddr *) &server_addr, server_addrlen) < 0) { 
+        graceful_return("bind", E_BIND);
+    }
+    LOG(Debug) << "server bind." << endl;
+
+    if (listen(server_fd, TCP_LISTEN_NUM) < 0) { 
+        graceful_return("listen", E_LISTEN); 
+    }
+    LOG(Debug) << "server listen." << endl;
+
+    int new_socket = accept(server_fd, (struct sockaddr *)&server_addr, (socklen_t*) &server_addrlen);
+    if (new_socket < 0) { 
+        graceful_return("accept", E_ACCEPT); 
+    }
+    else {
+        LOG(Info) << "server accept client success" << endl;
+    }
+
+    return new_socket;
+}
+
+int tcp_server_nonblock(const int port) {
+    // AF_INET: IPv4 protocol
+    // SOCK_STREAM: TCP protocol
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) { 
+        graceful_return("socket", E_CREATE_SOCKET);
+    } 
+    LOG(Debug) << "server socket." << endl;
+
+    int opt = 1;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) { 
+        graceful_return("setsockopt", E_SETSOCKOPT);
+    }
+
+    int flags;
+    flags = fcntl(server_fd, F_GETFL, 0);
+    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
 
     struct sockaddr_in server_addr; 
     server_addr.sin_family = AF_INET; 
@@ -703,6 +957,39 @@ int tcp_client_block(const char *ip, const int port) {
     }
     return client_fd;
 }
+
+int tcp_client_nonblock(const char *ip, const int port) {
+    // AF_INET_IPv4 protocol
+    // SOCK_STREAM: TCP protocol
+    int client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_fd < 0) { 
+        graceful_return("socket", E_CREATE_SOCKET);
+    }
+    LOG(Debug) << "server socket." << endl;
+
+    int flags;
+    flags = fcntl(client_fd, F_GETFL, 0);
+    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+
+
+    struct sockaddr_in server_addr; 
+    memset(&server_addr, '0', sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port); 
+    if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
+        LOG(Error) << "wrong peer IP" << endl;
+        graceful_return("wrong peer IP", E_WRONG_IP);
+    } 
+
+    if (connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) { 
+        graceful_return("connect", E_CONNECT); 
+    }
+    else {
+        LOG(Info) << "client connect server success" << endl;
+    }
+    return client_fd;
+}
+
 
 Status physical_layer_send(const int socket, const char *buf_send, const bool is_data, const bool is_end) {
     bool is_data_confirm = is_data | is_end;    // if is_end == true, is_data_confirm must be true.
