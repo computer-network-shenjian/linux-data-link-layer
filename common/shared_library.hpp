@@ -76,12 +76,12 @@ struct frame{
     packet     info;
 };
 
-extern bool sig_cksum_err;
-extern bool sig_frame_arrival;
-extern bool sig_network_layer_ready;
-extern bool sig_enable_network_layer;
-extern bool sig_timeout;
-extern bool sig_ack_timeout;
+extern int sig_cksum_err;
+extern int sig_frame_arrival;
+extern int sig_network_layer_ready;
+extern int sig_enable_network_layer;
+extern int sig_timeout;
+extern int sig_ack_timeout;
 
 /*****************************/
 /*****  Network Layer   ******/

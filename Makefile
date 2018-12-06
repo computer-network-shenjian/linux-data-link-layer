@@ -11,7 +11,7 @@ TARGET_RECEIVER:= $(SRC_RECEIVER:.cpp=)
 TARGET_SENDER_TEST := $(SRC_SENDER_TEST:.cpp=)
 TARGET_RECEIVER_TEST := $(SRC_RECEIVER_TEST:.cpp=)
 
-SRC_LIB := common/shared_library.cpp common/Log.cpp
+SRC_LIB := common/shared_library.cpp common/Log.cpp common/shared_conf.hpp common/status.hpp common/shared_library.hpp
 OBJ_LIB := $(SRC_LIB:.cpp=.o)
 
 RM := rm -f
