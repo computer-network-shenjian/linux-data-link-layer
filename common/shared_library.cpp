@@ -399,6 +399,10 @@ Status receiver_datalink_layer_test(int *pipefd) {
     close(pipefd[p_read]);
 
     LOG(Info) << "[RDL] RDL test passed!" << endl;
+
+    while(1){
+        sleep(1);
+    }
     return ALL_GOOD;
 }
 
