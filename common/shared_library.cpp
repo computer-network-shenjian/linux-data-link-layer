@@ -1,12 +1,12 @@
 #include "shared_library.hpp"
 
 
-bool sig_cksum_err              =   false;
-bool sig_frame_arrival          =   false;
-bool sig_network_layer_ready    =   false;
-bool sig_enable_network_layer   =   false;
-bool sig_timeout                =   false;
-bool sig_ack_timeout            =   false;
+int sig_cksum_err              =   false;
+int sig_frame_arrival          =   false;
+int sig_network_layer_ready    =   false;
+int sig_enable_network_layer   =   false;
+int sig_timeout                =   false;
+int sig_ack_timeout            =   false;
 
 
 /*****************************/
@@ -176,33 +176,33 @@ Status receiver_network_layer(int *pipefd) {
 /*****************************/
 
 void Handler_SIGFRARV(int sig) {
-    sig_frame_arrival = 1;
+    sig_frame_arrival ++;
 }
 
 void wait_for_event(event_type &event) {
     while(true){
         if(sig_frame_arrival){
-            sig_frame_arrival = false;
+            sig_frame_arrival --;
             event = frame_arrival;
             break;
         }   
         if(sig_cksum_err){
-            sig_cksum_err = false;
+            sig_cksum_err --;
             event = cksum_err;
             break;
         }
         if(sig_timeout){
-            sig_timeout = false;
+            sig_timeout --;
             event = timeout;
             break;
         }
         if(sig_network_layer_ready){
-            sig_network_layer_ready = false;
+            sig_network_layer_ready --;
             event = network_layer_ready;
             break;
         }
         if(sig_ack_timeout){
-            sig_ack_timeout = false;
+            sig_ack_timeout --;
             event = ack_timeout;
             break;
         }
@@ -266,6 +266,7 @@ Status sender_datalink_layer_test(int *pipefd) {
             LOG(Error) << "[SDL] Pipe write from SDL to SPL error" << endl;
             return E_PIPE_WRITE;            
         }
+
         if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
             break;
         }
@@ -432,11 +433,9 @@ Status sender_datalink_layer_utopia(int *pipefd) {
     //physical layer proc
     else if(phy_pid == 0){
         prctl(PR_SET_PDEATHSIG, SIGHUP);
-        LOG(Info) << "sender: SPL start."<< endl;
-
         rtn = sender_physical_layer(pipe_datalink_physical);
         if(rtn == TRANSMISSION_END){
-            LOG(Info) << "sender: Transmission end in SDL." << endl;
+            LOG(Info) << "[SPL] Transmission end." << endl;
             return rtn;
         }
         else if(rtn < 0){
@@ -444,7 +443,7 @@ Status sender_datalink_layer_utopia(int *pipefd) {
             return rtn;
         }
         else{    //return ALL_GOOD
-            LOG(Info) << "sender: SPL send frame successfully." << endl;
+            LOG(Info) << "[SPL] SPL end with success" << endl;
             return ALL_GOOD;
         }   
     }//end of else if
@@ -464,13 +463,12 @@ Status sender_datalink_layer_utopia(int *pipefd) {
 
             s.info = buffer;
             rtn = to_physical_layer(&s, pipe_datalink_physical);
-           
-            if(rtn == TRANSMISSION_END)
-                break;
             if(rtn < 0)
                 return rtn;
-            else
-                continue;
+
+            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
         }
 
         LOG(Info) << "[SDL] Transmission end detected" << endl;
@@ -486,44 +484,47 @@ Status sender_datalink_layer_utopia(int *pipefd) {
 }
 
 Status receiver_datalink_layer_utopia(int *pipefd) {
+    //exit when father proc exit
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
     //avoid zonbe proc
     signal(SIGCHLD, SIG_IGN);
     signal(SIGFRARV, Handler_SIGFRARV);
+
+    LOG(Info) << "[RDL] RDL start" << endl;
 
     Status rtn = ALL_GOOD;
     int pipe_physical_datalink[2];
 
     if(pipe(pipe_physical_datalink) == -1){
-        LOG(Error) << "receiver: Pipe INIT error in datalink layer." << endl;
+        LOG(Error) << "[RDL] pipe_datalink_physical init error" << endl;
         return E_PIPE_INIT;
+    }
+    else {
+        LOG(Info) << "[RDL] pipe_datalink_physical init ok" << endl;
     }
 
     pid_t phy_pid = fork();
 
     if(phy_pid < 0){
-        LOG(Error) << "receiver: SDL fork error." << endl;
+        LOG(Error) << "[RDL] fork unsuccessful" << endl;
         return E_FORK;
     }
 
     //physical layer proc 
     else if(phy_pid == 0){
-        //physical proc exit after datalink proc exit 
-        prctl(PR_SET_PDEATHSIG, SIGHUP);
-
-        LOG(Info) << "receiver: SPL start."<< endl;
-        while(rtn >= 0){
-            rtn = receiver_physical_layer(pipe_physical_datalink);
-            
-            // if(rtn == TRANSMISSION_END){
-            //     LOG(Info) << "receiver: Transmission end in SDL." << endl;
-            //     return rtn;
-            // }
-            if(rtn < 0)
-                LOG(Error) << "receiver: SPL failed, returned error." << endl;
-            else    //return ALL_GOOD
-                LOG(Info) << "receiver: SPL end successfully." << endl; 
+        rtn = receiver_physical_layer(pipe_physical_datalink);
+        // if(rtn == TRANSMISSION_END){
+        //     LOG(Info) << "receiver: Transmission end in SDL." << endl;
+        //     return rtn;
+        // }
+        if(rtn < 0){
+            LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
+            return rtn;
         }
-        return rtn;
+        else {
+            LOG(Info) << "[RPL] SPL end with success" << endl;
+            return ALL_GOOD;
+        } 
     }
 
     //datalink layer proc
@@ -548,27 +549,37 @@ Status receiver_datalink_layer_utopia(int *pipefd) {
             if(N_rtn < 0)
                 return N_rtn;
             //this must be done afster to_network_layer!!
-            if(P_rtn == TRANSMISSION_END)
-                return TRANSMISSION_END;
-            else
-                continue;
+            // if(P_rtn == TRANSMISSION_END)
+            //     return TRANSMISSION_END;
+
+            if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
         }
+    }
+    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death" << endl;
+    close(pipefd[p_write]);
+
+    LOG(Info) << "[RDL] RDL test passed!" << endl;
+
+    while(1){
+        sleep(1);
     }
     return ALL_GOOD;
 }
 
-Status from_network_layer(packet *p, int *pipefd) {
+Status from_network_layer(packet *p, int *pipefd){
     char pipe_buf[RAW_DATA_SIZE + 1];
     //p_write closed in upper function
     if (read(pipefd[p_read], pipe_buf, RAW_DATA_SIZE) <= 0) {
-        LOG(Error) << "sender: SNL read from SDL error." << endl;
+        LOG(Error) << "[SDL] read from SNL error." << endl;
         return E_PIPE_READ;
     }
     //data starts from data[12]
     memcpy(p->data, pipe_buf, RAW_DATA_SIZE);
-    LOG(Info) << "sender: SDL successfully gets info from SNL."<< endl;
+    LOG(Info) << "[SDL] successfully gets info from SNL."<< endl;
     return ALL_GOOD;
-}     
+}        
 
 Status to_physical_layer(frame *s, int *pipefd) {
         char pipe_buf[LEN_PKG_DATA+1];
@@ -579,33 +590,30 @@ Status to_physical_layer(frame *s, int *pipefd) {
 
         close(pipefd[p_read]);  
         if((write(pipefd[p_write], pipe_buf, LEN_PKG_DATA )) <= 0){
-            LOG(Error) << "sender: SDL write to SPL error." << endl;
+            LOG(Error) << "[SDL] write to SPL error." << endl;
             return E_PIPE_WRITE;
         }
-        LOG(Info) << "sender: SDL sent frame to SPL successfully." << endl;
 
-        if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
-            return TRANSMISSION_END;
-        else
-            return ALL_GOOD;
+        LOG(Info) << "[SDL] sent frame to SPL successfully." << endl;
+        return ALL_GOOD;
 }
 
 Status to_network_layer(packet *p, int *pipefd) {
     //p_read closed in upper function
     if (write(pipefd[p_write], p->data, RAW_DATA_SIZE) <= 0) {
-        LOG(Error) << "receiver: SNL send to SDL error." << endl;
+        LOG(Error) << "[RDL] Pipe write from RDL to RNL error" << endl;
         return E_PIPE_WRITE;
     }
-    LOG(Info) << "sender: SDL successfully gets info from SNL."<< endl;
+    LOG(Info) << "[RDL] send data to RNL successfully."<< endl;
     return ALL_GOOD;
-}   
+}     
 
 Status from_physical_layer(frame *s, int *pipefd) {
-    char pipe_buf[LEN_PKG_DATA+1];
+    char pipe_buf[LEN_PKG_DATA+1] = {0};
 
     close(pipefd[p_write]); 
     if((read(pipefd[p_read], pipe_buf, LEN_PKG_DATA)) <= 0){
-        LOG(Error) << "receiver: SDL read from SPL error." << endl;
+        LOG(Error) << "[RDL] Pipe read from RPL to RDL error" << endl;
         return E_PIPE_READ;
     }
     memcpy(&(s->kind), pipe_buf, sizeof(int));
@@ -613,9 +621,9 @@ Status from_physical_layer(frame *s, int *pipefd) {
     memcpy(&(s->ack), pipe_buf+8, sizeof(int));
     memcpy(s->info.data, pipe_buf+12, RAW_DATA_SIZE);
 
-    LOG(Info) << "receiver: SDL received frame from SPL successfully." << endl;
+    LOG(Info) << "[RDL] read frame from SPL successfully." << endl;
     return ALL_GOOD;
-}   
+}    
 
 
 //not used in Utopia

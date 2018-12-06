@@ -27,9 +27,8 @@ int main() {
         return E_FORK;
     }
     else if (datalink_pid == 0) {
-        receiver_datalink_layer(test, pipe_network_datalink);
-        /*
-        Status val_datalink = receiver_datalink_layer(test, pipe_network_datalink);
+       // Status val_datalink = receiver_datalink_layer(test, pipe_network_datalink);
+        Status val_datalink = receiver_datalink_layer(utopia, pipe_network_datalink);
         if (val_datalink < 0) {
             LOG(Error) << "[RDL] Error occured in RDL with code: " << val_datalink << endl;
             return val_datalink;
@@ -38,7 +37,7 @@ int main() {
             LOG(Info) << "[RDL] RDL end with success" << endl;
             return ALL_GOOD;
         }
-        */
+        
     }
     else {
         Status val_rnl = receiver_network_layer(pipe_network_datalink);
