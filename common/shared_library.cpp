@@ -773,7 +773,7 @@ Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data)
     }
 }
 
-Status sender_physical_layer(int *pipefd) {
+Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     int client_fd = tcp_client_block();
     LOG(Debug) << "[SPL] client_fd\t" << client_fd << endl;
@@ -782,51 +782,85 @@ Status sender_physical_layer(int *pipefd) {
         return client_fd;
     }
 
-    close(pipefd[p_write]);
+    close(pipefd_down[p_write]);
+    close(pipefd_up[p_read]);
+
+    int r_rtn, w_rtn;
+    int *r_seq;
+    frame r;
+    char buffer[LEN_PKG_DATA] = {0};
+    Status val_physical_layer_send;
+    Status val_physical_layer_recv;
 
     while(1) {
-        char buffer[LEN_PKG_DATA] = {0};
-        if (read(pipefd[p_read], buffer, LEN_PKG_DATA) <= 0) {
+        //nonblock
+        r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_DATA);
+        if(r_rtn <= 0 && errno != EAGAIN){
             LOG(Error) << "[SPL] Pipe read from SNL to SDL error" << endl;
             return E_PIPE_READ;
         }
-        LOG(Debug) << "[SPL] Read info from SNL: " << buffer << endl;
+        //if r_rtn == -1 and errno == EAGAIN, mean temporarily no data to read, just don't read this time
+        if (r_rtn > 0) {
+            LOG(Debug) << "[SPL] Read info from SNL: " << buffer << endl;
 
-        Status val_physical_layer_send;
+            if (0 == memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE)) {
+                LOG(Info) << "[SPL] Transmission end, detected by SPL" << endl;
+                val_physical_layer_send = physical_layer_send(client_fd, buffer, true, true);
+                LOG(Debug) << "[SPL] val_physical_layer_send\t" << val_physical_layer_send << endl;
+                if (val_physical_layer_send < 0) {
+                    LOG(Error) << "[SPL] An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
+                    return val_physical_layer_send;
+                }
+                close(pipefd_down[p_read]);
+                // THINK: do we need to sleep here? How long do we need to sleep?
+                //sleep(1);
+                // THINK: can client_fd be closed here?
+                while(1) {
+                    if (0 == send(client_fd, NULL, 0, 0)) {
+                        break;
+                    }
+                    else {
+                        sleep(1);
+                    }
+                }
+                LOG(Info) << "[SPL] peer(RPL) disconnected detected, SPL will end too." << endl;
+                close(client_fd);
+                return TRANSMISSION_END;
+            }
+            else {
+                val_physical_layer_send = physical_layer_send(client_fd, buffer);
+                LOG(Debug) << "[SPL] val_physical_layer_send\t" << val_physical_layer_send << endl;
+                if (val_physical_layer_send < 0) {
+                    LOG(Error) << "[SPL] An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
+                    return val_physical_layer_send;
+                }
+            }
+        }//end of if read > 0
 
-        if (0 == memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE)) {
-            LOG(Info) << "[SPL] Transmission end, detected by SPL" << endl;
-            val_physical_layer_send = physical_layer_send(client_fd, buffer, true, true);
-            LOG(Debug) << "[SPL] val_physical_layer_send\t" << val_physical_layer_send << endl;
-            if (val_physical_layer_send < 0) {
-                LOG(Error) << "[SPL] An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
-                return val_physical_layer_send;
+        //expecting to recv ACK/NAK
+        val_physical_layer_recv = physical_layer_recv(client_fd, buffer, false);
+        //nothing received
+        if(val_physical_layer_recv == E_RECV)   
+            continue;
+        //recv frame from receiver: ACK/NAK
+        else{
+            LOG(Debug) << "[RPL] Get info from SPL: " << buffer << endl;
+            //to test if recved ACK/NAK frame
+            r_seq = buffer+4;
+            if((*r_seq) != 0xFFFFFFFF){
+                LOG(Error) << "received unkown frame type!" <<endl;
+                continue;
             }
-            close(pipefd[p_read]);
-            // THINK: do we need to sleep here? How long do we need to sleep?
-            //sleep(1);
-            // THINK: can client_fd be closed here?
-            while(1) {
-                if (0 == send(client_fd, NULL, 0, 0)) {
-                    break;
-                }
-                else {
-                    sleep(1);
-                }
+            //recognized ACK/NAK
+            //set buffer+12 ~ buffer+1035 all zero
+            memcpy(buffer+12, all_zero, RAW_DATA_SIZE);
+            if (write(pipefd[p_write], buffer, LEN_PKG_DATA) < 0) {
+                LOG(Error) << "Pipe write from RPL to RDL error" << endl;
+                return E_PIPE_WRITE;
             }
-            LOG(Info) << "[SPL] peer(RPL) disconnected detected, SPL will end too." << endl;
-            close(client_fd);
-            return TRANSMISSION_END;
-        }
-        else {
-            val_physical_layer_send = physical_layer_send(client_fd, buffer);
-            LOG(Debug) << "[SPL] val_physical_layer_send\t" << val_physical_layer_send << endl;
-            if (val_physical_layer_send < 0) {
-                LOG(Error) << "[SPL] An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
-                return val_physical_layer_send;
-            }
-        }
-    }
+            kill(getppid(), SIGFRARV);
+        }//end of else
+    }//end of while
 }
 
 Status receiver_physical_layer(int *pipefd) {
