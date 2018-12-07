@@ -1316,7 +1316,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
 // }
 
 void ticking_handler(int sig) {
-    if (--(*timer_list.begin().first) == 0) {
+    if (--(*(timer_list.begin()).first) == 0) {
         timer_list.pop_front();
     }
 }
