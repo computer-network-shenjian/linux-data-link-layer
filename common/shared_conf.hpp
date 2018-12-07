@@ -21,6 +21,55 @@ const unsigned int 	RAW_DATA_SIZE 	= 1024;
 
 const char all_zero[LEN_PKG_DATA+1] = {0};
 
+// Datalink layer protocols
+enum DProtocol{
+    test = 0,
+    utopia = 1,
+    simple_stop_and_wait = 2,
+    noisy_stop_and_wait = 3,
+    one_bit_sliding = 4,
+    back_n = 5,
+    selective_repeat = 6
+};
+
+// Pipe read and pipe write.
+enum Pipe_RW{
+    p_read = 0,
+    p_write = 1
+};
+
+typedef enum {
+    frame_arrival,
+    cksum_err,
+    timeout,
+    network_layer_ready,
+    ack_timeout
+}event_type;
+
+typedef enum {
+    data,
+    ack,
+    nak
+}frame_kind;  //frame types: data/ack/nak
+
+struct packet{
+    unsigned char data[RAW_DATA_SIZE] = {0};
+};
+
+struct frame{
+    frame_kind kind;
+    seq_nr     seq;
+    seq_nr     ack;
+    packet     info;
+};
+
+extern int sig_cksum_err;
+extern int sig_frame_arrival;
+extern int sig_network_layer_ready;
+extern int sig_enable_network_layer;
+extern int sig_timeout;
+extern int sig_ack_timeout;
+
 //#define SEND_FILE "rand_1024.myfile"
 #define SEND_FILE "rand_1.myfile"
 #define RECV_FILE "recv_1.myfile"
