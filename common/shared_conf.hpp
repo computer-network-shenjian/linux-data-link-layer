@@ -70,8 +70,8 @@ extern int sig_enable_network_layer;
 extern int sig_timeout;
 extern int sig_ack_timeout;
 
-#define SEND_FILE "README.md"
+#define SEND_FILE "rand_100.myfile"
 #define RECV_FILE "recv.myfile"
 
 const int timeout_seconds = 0;
-const int timeout_microseconds = 500000;
+const int timeout_microseconds = 50;

@@ -1,7 +1,7 @@
 CXXFLAGS := -std=c++11 -Wall -Wextra
 
-SRC_SENDER := 01/sender1.cpp 02/sender2.cpp 03/sender3.cpp #04/sender4.cpp #05/sender5.cpp #06/sender6.cpp
-SRC_RECEIVER := 01/receiver1.cpp 02/receiver2.cpp 03/receiver3.cpp #04/receiver4.cpp #05/receiver5.cpp #06/receiver6.cpp
+SRC_SENDER := 01/sender1.cpp 02/sender2.cpp #03/sender3.cpp #04/sender4.cpp #05/sender5.cpp #06/sender6.cpp
+SRC_RECEIVER := 01/receiver1.cpp 02/receiver2.cpp #03/receiver3.cpp #04/receiver4.cpp #05/receiver5.cpp #06/receiver6.cpp
 SRC_SENDER_TEST := test/sender_physical_test.cpp
 SRC_RECEIVER_TEST := test/receiver_physical_test.cpp
 

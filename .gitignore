@@ -4,6 +4,7 @@
 *.pdf
 *.myfile
 *.log
+*.txt
 sender1
 receiver1
 sender2

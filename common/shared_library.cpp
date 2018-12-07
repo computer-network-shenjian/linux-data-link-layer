@@ -206,7 +206,7 @@ void wait_for_event(event_type &event) {
             break;
         }
         else {
-            usleep(1);
+            sleep(1);
             continue;
         }
     }
@@ -588,7 +588,7 @@ Status RDL_utopia(int *pipefd) {
                     break;
                 }
                 else {
-                    usleep(1);
+                    sleep(1);
                 }
             }
 
@@ -687,7 +687,7 @@ Status SDL_StopAndWait(int *pipefd) {
     else{    
         //close write port
         close(pipefd[p_write]);
-        frame s;
+        frame s, trash;
         packet buffer;
         event_type event;
 
@@ -716,15 +716,19 @@ Status SDL_StopAndWait(int *pipefd) {
             }
 
             // Block until event comes.
+            
             while(true){
                 wait_for_event(event);
                 if(event == frame_arrival) {
+                    from_physical_layer(&trash, pipe_physical_datalink);
+                    LOG(Debug) << "[SDL] get ACK and trashed" << endl;
                     break;
                 }
                 else {
-                    usleep(1);
+                    sleep(1);
                 }
             }
+            
         }
 
         LOG(Info) << "[SDL] Transmission end detected" << endl;
@@ -822,7 +826,7 @@ Status RDL_StopAndWait(int *pipefd) {
                     break;
                 }
                 else {
-                    usleep(1);
+                    sleep(1);
                 }
             }
 
@@ -843,7 +847,7 @@ Status RDL_StopAndWait(int *pipefd) {
             if(P_rtn < 0)
                 return P_rtn;
             
-            LOG(Debug) << "[RDL] Send ACK ok!" << endl;
+            LOG(Debug) << "[RDL] Send ACK" << endl;
 
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
                 break;
@@ -1050,7 +1054,7 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data, cons
         int val_ready = ready_to_send(socket);
         // if send not ready, sleep 10ms and try again
         if (val_ready < 0) {
-            usleep(1);
+            sleep(1);
             continue;
         }
 
@@ -1089,7 +1093,7 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
         int val_ready = ready_to_recv(socket);
         // if recv not ready, sleep 10ms and try again
         if (val_ready < 0) {
-            usleep(1);
+            sleep(1);
             continue;
         }
 
@@ -1251,7 +1255,7 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
     
         //if nothing happened in this loop
         if(flag_sleep == true)
-            usleep(1);
+            sleep(1);
     }//end of while
 
     //detected transmission_end
@@ -1374,7 +1378,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
                 break;
         //if nothing happened in this loop
         if(flag_sleep == true)
-            usleep(1);
+            sleep(1);
     }//end of while
 
     LOG(Info) << "[RPL] Transmission end, detected by RPL" << endl;
