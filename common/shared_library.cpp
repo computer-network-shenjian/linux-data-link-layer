@@ -997,7 +997,7 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data, cons
     }
     unsigned int total_send = 0;
     while (total_send < buf_length) {
-        int val_send = send(socket, buffer, buf_length, 0);
+        int val_send = send(socket, buffer, buf_length-total_recv, 0);
         if (val_send < 0) {
             graceful_return("send", E_SEND);
         }
@@ -1023,7 +1023,7 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
     char buffer[LEN_PKG_DATA] = {0};
     unsigned int total_recv = 0;
     while (total_recv < buf_length) {
-        int val_recv = recv(socket, buffer, buf_length - total_recv, 0);
+        int val_recv = recv(socket, buffer, buf_length-total_recv, 0);
         if (val_recv < 0) {
             graceful_return("recv", E_RECV);
         }
@@ -1328,4 +1328,3 @@ void _start_timer(seq_nr k) {
 void _stop_timer(seq_nr k) {
     tiemr_list.remove_if([&k](const auto &el) { return el.second == k; } );
 }
-

@@ -23,13 +23,13 @@ const char all_zero[LEN_PKG_DATA+1] = {0};
 
 // Datalink layer protocols
 enum DProtocol{
-    test = 0,
-    utopia = 1,
-    simple_stop_and_wait = 2,
-    noisy_stop_and_wait = 3,
-    one_bit_sliding = 4,
-    back_n = 5,
-    selective_repeat = 6
+    test,
+    utopia,
+    simple_stop_and_wait,
+    noisy_stop_and_wait,
+    one_bit_sliding,
+    back_n,
+    selective_repeat
 };
 
 // Pipe read and pipe write.
