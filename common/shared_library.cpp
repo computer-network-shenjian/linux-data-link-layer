@@ -33,7 +33,7 @@ unsigned int count_ending_zeros(const char * const data, unsigned int data_lengt
     return data_length - 1 - counter;
 }
 
-Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid) {
+Status SNL_test(int *pipefd, const pid_t datalink_pid) {
     close(pipefd[p_read]);   // write only
 
     // 1. send "hello, y'all! SNL is gonna test y'all!".
@@ -70,7 +70,7 @@ Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid) {
     return ALL_GOOD;
 }
 
-Status receiver_network_layer_test(int *pipefd) {
+Status RNL_test(int *pipefd) {
     close(pipefd[p_write]);   // read only
     char pipe_buf[RAW_DATA_SIZE+1] = {0};
 
@@ -213,7 +213,7 @@ void wait_for_event(event_type &event) {
     return;
 }
 
-Status sender_datalink_layer_test(int *pipefd) {
+Status SDL_test(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     LOG(Info) << "[SDL] SDL start" << endl;
 
@@ -298,20 +298,26 @@ Status sender_datalink_layer(DProtocol protocol, int *pipefd) {
     switch(protocol) {
         case(test): {
             LOG(Info) << "[SDL] Getting into SDL with protocol: " << "test" << endl;
-            val = sender_datalink_layer_test(pipefd);
-            LOG(Debug) << "[SDL] Return value of sender_datalink_layer_test\t" << val << endl;
+            val = SDL_test(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_test\t" << val << endl;
             return val;
         }
         case(utopia): {
             LOG(Info) << "[SDL] Getting into SDL with protocol: utopia" << endl;
-            val = sender_datalink_layer_utopia(pipefd);
-            LOG(Debug) << "[SDL] Return value of sender_datalink_layer_utopia\t" << val << endl;
+            val = SDL_utopia(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_utopia\t" << val << endl;
             return val;
         }
        case(simple_stop_and_wait): {
             LOG(Info) << "[SDL] Getting into SDL with protocol: simple_stop_and_wait" << endl;
-            val = sender_datalink_layer_StopAndWait(pipefd);
-            LOG(Debug) << "[SDL] Return value of sender_datalink_layer_StopAndWait\t" << val << endl;
+            val = SDL_StopAndWait(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_StopAndWait\t" << val << endl;
+            return val;
+        }
+        case(noisy_stop_and_wait): {
+            LOG(Info) << "[SDL] Getting into SDL with protocol: noisy_stop_and_wait" << endl;
+            val = SDL_noisy_SAW(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_noisy_SAW\t" << val << endl;
             return val;
         }
         default: {
@@ -326,20 +332,26 @@ Status receiver_datalink_layer(DProtocol protocol, int*pipefd) {
     switch(protocol) {
         case(test): {
             LOG(Info) << "[RDL] Getting into RDL with protocol: " << "test" << endl;
-             val = receiver_datalink_layer_test(pipefd);
-            LOG(Debug) << "[RDL] Return value of receiver_datalink_layer_test\t" << val << endl;
+             val = RDL_test(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_test\t" << val << endl;
             return val;
         }
         case(utopia): {
             LOG(Info) << "[RDL] Getting into RDL with protocol: utopia" << endl;
-            val = receiver_datalink_layer_utopia(pipefd);
-            LOG(Debug) << "[RDL] Return value of receiver_datalink_layer_utopia\t" << val << endl;
+            val = RDL_utopia(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_utopia\t" << val << endl;
             return val;
         }
         case(simple_stop_and_wait): {
             LOG(Info) << "[RDL] Getting into RDL with protocol: simple_stop_and_wait" << endl;
-            val = receiver_datalink_layer_StopAndWait(pipefd);
-            LOG(Debug) << "[RDL] Return value of receiver_datalink_layer_simple_stop_and_wait\t" << val << endl;
+            val = RDL_StopAndWait(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_simple_stop_and_wait\t" << val << endl;
+            return val;
+        }
+        case(noisy_stop_and_wait): {
+            LOG(Info) << "[RDL] Getting into RDL with protocol: noisy_stop_and_wait" << endl;
+            val = RDL_noisy_SAW(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_noisy_SAW\t" << val << endl;
             return val;
         }
         default: {
@@ -349,7 +361,7 @@ Status receiver_datalink_layer(DProtocol protocol, int*pipefd) {
     }
 }
 
-Status receiver_datalink_layer_test(int *pipefd) {
+Status RDL_test(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
 
     signal(SIGFRARV, SIG_IGN);
@@ -431,7 +443,7 @@ Status receiver_datalink_layer_test(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status sender_datalink_layer_utopia(int *pipefd) {
+Status SDL_utopia(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     LOG(Info) << "[SDL] SDL start" << endl;
 
@@ -511,7 +523,7 @@ Status sender_datalink_layer_utopia(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status receiver_datalink_layer_utopia(int *pipefd) {
+Status RDL_utopia(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     //avoid zonbe proc
@@ -601,7 +613,7 @@ Status receiver_datalink_layer_utopia(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status sender_datalink_layer_StopAndWait(int *pipefd) {
+Status SDL_StopAndWait(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     signal(SIGFRARV, handler_SIGFRARV);
 
@@ -705,7 +717,7 @@ Status sender_datalink_layer_StopAndWait(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status receiver_datalink_layer_StopAndWait(int *pipefd) {
+Status RDL_StopAndWait(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     //avoid zonbe proc
@@ -810,6 +822,14 @@ Status receiver_datalink_layer_StopAndWait(int *pipefd) {
     while(1){
         sleep(1);
     }
+    return ALL_GOOD;
+}
+
+Status SDL_noisy_SAW(int *pipefd) {
+    return ALL_GOOD;
+}
+
+Status RDL_noisy_SAW(int *pipefd) {
     return ALL_GOOD;
 }
 
