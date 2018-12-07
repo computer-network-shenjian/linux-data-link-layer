@@ -53,9 +53,9 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
 unsigned int count_ending_zeros(const char * const data, unsigned int data_length = 1024);
 // Intro: count the number of ending zeros of an array from position data_length.
 
-Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid);
+Status SNL_test(int *pipefd, const pid_t datalink_pid);
 
-Status receiver_network_layer_test(int *pipefd);
+Status RNL_test(int *pipefd);
 
 Status sender_network_layer(int *pipefd, const pid_t datalink_pid);
 
@@ -65,7 +65,7 @@ Status receiver_network_layer(int *pipefd);
 /*****************************/
 /*****  Datalink Layer   *****/
 /*****************************/
-void Handler_SIGFRARV(int sig);
+void handler_SIGFRARV(int sig);
 
 void wait_for_event(event_type &event);
 
@@ -150,11 +150,11 @@ void disable_network_layer(void);
 //function:
 // disable network layer -> disable new network_layer_ready event
 
-Status sender_datalink_layer_test(int *pipefd);
+Status SDL_test(int *pipefd);
 
 Status sender_datalink_layer(DProtocol protocol, int *pipefd);
 
-Status sender_datalink_layer_utopia(int *pipefd);
+Status SDL_utopia(int *pipefd);
 //function:
 //      sender datalink layer in protocol utopia
 //precondition:
@@ -166,15 +166,19 @@ Status sender_datalink_layer_utopia(int *pipefd);
         // 4.TRANSMISSION_END   transimission end(returned by SPL)
         // 5.ALL_GOOD           no error
         // 6.other Error returns from function: sender_physical_layer
-Status sender_datalink_layer_StopAndWait(int *pipefd);
+Status SDL_StopAndWait(int *pipefd);
 
-Status receiver_datalink_layer_StopAndWait(int *pipefd);
+Status RDL_StopAndWait(int *pipefd);
 
-Status receiver_datalink_layer_utopia(int *pipefd);
+Status SDL_noisy_SAW(int *pipefd);
+
+Status RDL_noisy_SAW(int *pipefd);
+
+Status RDL_utopia(int *pipefd);
 
 Status receiver_datalink_layer(DProtocol protocol, int *pipefd);
 
-Status receiver_datalink_layer_test(int *pipefd);
+Status RDL_test(int *pipefd);
 
 
 /*****************************/
@@ -205,7 +209,7 @@ int tcp_client_block(const char *ip = "0.0.0.0", const int port = 20350);
     // 3. Peer IP wrong: return E_WRONG_IP.
     // 4. Connect error: return E_CONNECT.
 
-Status physical_layer_send(const int socket, const char *buf_send, const bool is_data = true, const bool is_end = false);
+Status tcp_send(const int socket, const char *buf_send, const bool is_data = true, const bool is_end = false);
 // Intro: Send packages from Sender Physical Level to Receiver Physical Level.
 // Caution: If last package is less than 1036 bytes, SDL should fill '\0' to exact 1036 bytes before send before transmit package to SPL.
 // Function:
@@ -222,7 +226,7 @@ Status physical_layer_send(const int socket, const char *buf_send, const bool is
     // 3. Peer disconnected: return E_PEER_DISCONNECTED.
     // 4. Wrong byte sent: return E_WRONG_BYTE.
 
-Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data = true);
+Status tcp_recv(const int socket, char *buf_recv, const bool is_data = true);
 // Intro: Receive packages to Receiver Physical Level from Sender Physical Level.
 // Caution: If last package is not all empty, but with '\0' at the end, RDL should discard all '\0' at the end.
 // Function:

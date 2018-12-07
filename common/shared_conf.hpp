@@ -70,6 +70,5 @@ extern int sig_enable_network_layer;
 extern int sig_timeout;
 extern int sig_ack_timeout;
 
-//#define SEND_FILE "rand_1024.myfile"
 #define SEND_FILE "rand_1.myfile"
 #define RECV_FILE "recv_1.myfile"

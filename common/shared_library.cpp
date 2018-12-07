@@ -33,7 +33,7 @@ unsigned int count_ending_zeros(const char * const data, unsigned int data_lengt
     return data_length - 1 - counter;
 }
 
-Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid) {
+Status SNL_test(int *pipefd, const pid_t datalink_pid) {
     close(pipefd[p_read]);   // write only
 
     // 1. send "hello, y'all! SNL is gonna test y'all!".
@@ -70,7 +70,7 @@ Status sender_network_layer_test(int *pipefd, const pid_t datalink_pid) {
     return ALL_GOOD;
 }
 
-Status receiver_network_layer_test(int *pipefd) {
+Status RNL_test(int *pipefd) {
     close(pipefd[p_write]);   // read only
     char pipe_buf[RAW_DATA_SIZE+1] = {0};
 
@@ -175,7 +175,7 @@ Status receiver_network_layer(int *pipefd) {
 /*****  Datalink Layer   *****/
 /*****************************/
 
-void Handler_SIGFRARV(int sig) {
+void handler_SIGFRARV(int sig) {
     if(sig == SIGFRARV)
         sig_frame_arrival ++;
 }
@@ -213,7 +213,7 @@ void wait_for_event(event_type &event) {
     return;
 }
 
-Status sender_datalink_layer_test(int *pipefd) {
+Status SDL_test(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     LOG(Info) << "[SDL] SDL start" << endl;
 
@@ -298,20 +298,26 @@ Status sender_datalink_layer(DProtocol protocol, int *pipefd) {
     switch(protocol) {
         case(test): {
             LOG(Info) << "[SDL] Getting into SDL with protocol: " << "test" << endl;
-            val = sender_datalink_layer_test(pipefd);
-            LOG(Debug) << "[SDL] Return value of sender_datalink_layer_test\t" << val << endl;
+            val = SDL_test(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_test\t" << val << endl;
             return val;
         }
         case(utopia): {
             LOG(Info) << "[SDL] Getting into SDL with protocol: utopia" << endl;
-            val = sender_datalink_layer_utopia(pipefd);
-            LOG(Debug) << "[SDL] Return value of sender_datalink_layer_utopia\t" << val << endl;
+            val = SDL_utopia(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_utopia\t" << val << endl;
             return val;
         }
        case(simple_stop_and_wait): {
             LOG(Info) << "[SDL] Getting into SDL with protocol: simple_stop_and_wait" << endl;
-            val = sender_datalink_layer_StopAndWait(pipefd);
-            LOG(Debug) << "[SDL] Return value of sender_datalink_layer_StopAndWait\t" << val << endl;
+            val = SDL_StopAndWait(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_StopAndWait\t" << val << endl;
+            return val;
+        }
+        case(noisy_stop_and_wait): {
+            LOG(Info) << "[SDL] Getting into SDL with protocol: noisy_stop_and_wait" << endl;
+            val = SDL_noisy_SAW(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_noisy_SAW\t" << val << endl;
             return val;
         }
         default: {
@@ -326,20 +332,26 @@ Status receiver_datalink_layer(DProtocol protocol, int*pipefd) {
     switch(protocol) {
         case(test): {
             LOG(Info) << "[RDL] Getting into RDL with protocol: " << "test" << endl;
-             val = receiver_datalink_layer_test(pipefd);
-            LOG(Debug) << "[RDL] Return value of receiver_datalink_layer_test\t" << val << endl;
+             val = RDL_test(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_test\t" << val << endl;
             return val;
         }
         case(utopia): {
             LOG(Info) << "[RDL] Getting into RDL with protocol: utopia" << endl;
-            val = receiver_datalink_layer_utopia(pipefd);
-            LOG(Debug) << "[RDL] Return value of receiver_datalink_layer_utopia\t" << val << endl;
+            val = RDL_utopia(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_utopia\t" << val << endl;
             return val;
         }
         case(simple_stop_and_wait): {
             LOG(Info) << "[RDL] Getting into RDL with protocol: simple_stop_and_wait" << endl;
-            val = receiver_datalink_layer_StopAndWait(pipefd);
-            LOG(Debug) << "[RDL] Return value of receiver_datalink_layer_simple_stop_and_wait\t" << val << endl;
+            val = RDL_StopAndWait(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_simple_stop_and_wait\t" << val << endl;
+            return val;
+        }
+        case(noisy_stop_and_wait): {
+            LOG(Info) << "[RDL] Getting into RDL with protocol: noisy_stop_and_wait" << endl;
+            val = RDL_noisy_SAW(pipefd);
+            LOG(Debug) << "[RDL] Return value of RDL_noisy_SAW\t" << val << endl;
             return val;
         }
         default: {
@@ -349,7 +361,7 @@ Status receiver_datalink_layer(DProtocol protocol, int*pipefd) {
     }
 }
 
-Status receiver_datalink_layer_test(int *pipefd) {
+Status RDL_test(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
 
     signal(SIGFRARV, SIG_IGN);
@@ -431,7 +443,7 @@ Status receiver_datalink_layer_test(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status sender_datalink_layer_utopia(int *pipefd) {
+Status SDL_utopia(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     LOG(Info) << "[SDL] SDL start" << endl;
 
@@ -511,12 +523,12 @@ Status sender_datalink_layer_utopia(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status receiver_datalink_layer_utopia(int *pipefd) {
+Status RDL_utopia(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     //avoid zonbe proc
     signal(SIGCHLD, SIG_IGN);
-    signal(SIGFRARV, Handler_SIGFRARV);
+    signal(SIGFRARV, handler_SIGFRARV);
     LOG(Info) << "[RDL] RDL start" << endl;
 
     Status rtn = ALL_GOOD;
@@ -601,9 +613,9 @@ Status receiver_datalink_layer_utopia(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status sender_datalink_layer_StopAndWait(int *pipefd) {
+Status SDL_StopAndWait(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    signal(SIGFRARV, Handler_SIGFRARV);
+    signal(SIGFRARV, handler_SIGFRARV);
 
     LOG(Info) << "[SDL] SDL start" << endl;
 
@@ -705,12 +717,12 @@ Status sender_datalink_layer_StopAndWait(int *pipefd) {
     return ALL_GOOD;
 }
 
-Status receiver_datalink_layer_StopAndWait(int *pipefd) {
+Status RDL_StopAndWait(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
     //avoid zonbe proc
     signal(SIGCHLD, SIG_IGN);
-    signal(SIGFRARV, Handler_SIGFRARV);
+    signal(SIGFRARV, handler_SIGFRARV);
 
     LOG(Info) << "[RDL] RDL start" << endl;
 
@@ -810,6 +822,14 @@ Status receiver_datalink_layer_StopAndWait(int *pipefd) {
     while(1){
         sleep(1);
     }
+    return ALL_GOOD;
+}
+
+Status SDL_noisy_SAW(int *pipefd) {
+    return ALL_GOOD;
+}
+
+Status RDL_noisy_SAW(int *pipefd) {
     return ALL_GOOD;
 }
 
@@ -938,51 +958,6 @@ int tcp_server_block(const int port) {
     return new_socket;
 }
 
-int tcp_server_nonblock(const int port) {
-    // AF_INET: IPv4 protocol
-    // SOCK_STREAM: TCP protocol
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) { 
-        graceful_return("socket", E_CREATE_SOCKET);
-    } 
-    LOG(Debug) << "server socket." << endl;
-
-    int opt = 1;
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) { 
-        graceful_return("setsockopt", E_SETSOCKOPT);
-    }
-
-    int flags;
-    flags = fcntl(server_fd, F_GETFL, 0);
-    fcntl(server_fd, F_SETFL, flags | O_NONBLOCK);
-
-    struct sockaddr_in server_addr; 
-    server_addr.sin_family = AF_INET; 
-    // INADDR_ANY means 0.0.0.0(localhost), or all IP of local machine.
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port); 
-    int server_addrlen = sizeof(server_addr);
-    if (bind(server_fd, (struct sockaddr *) &server_addr, server_addrlen) < 0) { 
-        graceful_return("bind", E_BIND);
-    }
-    LOG(Debug) << "server bind." << endl;
-
-    if (listen(server_fd, TCP_LISTEN_NUM) < 0) { 
-        graceful_return("listen", E_LISTEN); 
-    }
-    LOG(Debug) << "server listen." << endl;
-
-    int new_socket = accept(server_fd, (struct sockaddr *)&server_addr, (socklen_t*) &server_addrlen);
-    if (new_socket < 0) { 
-        graceful_return("accept", E_ACCEPT); 
-    }
-    else {
-        LOG(Info) << "server accept client success" << endl;
-    }
-
-    return new_socket;
-}
-
 int tcp_client_block(const char *ip, const int port) {
     // AF_INET_IPv4 protocol
     // SOCK_STREAM: TCP protocol
@@ -1010,39 +985,7 @@ int tcp_client_block(const char *ip, const int port) {
     return client_fd;
 }
 
-int tcp_client_nonblock(const char *ip, const int port) {
-    // AF_INET_IPv4 protocol
-    // SOCK_STREAM: TCP protocol
-    int client_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (client_fd < 0) { 
-        graceful_return("socket", E_CREATE_SOCKET);
-    }
-    LOG(Debug) << "server socket." << endl;
-
-    int flags;
-    flags = fcntl(client_fd, F_GETFL, 0);
-    fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
-
-
-    struct sockaddr_in server_addr; 
-    memset(&server_addr, '0', sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port); 
-    if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
-        LOG(Error) << "wrong peer IP" << endl;
-        graceful_return("wrong peer IP", E_WRONG_IP);
-    } 
-
-    if (connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) { 
-        graceful_return("connect", E_CONNECT); 
-    }
-    else {
-        LOG(Info) << "client connect server success" << endl;
-    }
-    return client_fd;
-}
-
-Status physical_layer_send(const int socket, const char *buf_send, const bool is_data, const bool is_end) {
+Status tcp_send(const int socket, const char *buf_send, const bool is_data, const bool is_end) {
     bool is_data_confirm = is_data | is_end;    // if is_end == true, is_data_confirm must be true.
     const unsigned int buf_length = is_data_confirm ? LEN_PKG_DATA : LEN_PKG_NODATA;
     char buffer[LEN_PKG_DATA] = {0};
@@ -1075,7 +1018,7 @@ Status physical_layer_send(const int socket, const char *buf_send, const bool is
     }
 }
 
-Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data) {
+Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
     const unsigned int buf_length = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
     char buffer[LEN_PKG_DATA] = {0};
     unsigned int total_recv = 0;
@@ -1118,6 +1061,10 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
         return client_fd;
     }
 
+    int flags;
+    flags = fcntl(client_fd, F_GETFL, 0);
+    fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+
     close(pipefd_down[p_write]);
     if(pipefd_up)
         close(pipefd_up[p_read]);
@@ -1126,8 +1073,8 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
     unsigned int *r_seq;
     frame r;
     char buffer[LEN_PKG_DATA] = {0};
-    Status val_physical_layer_send;
-    Status val_physical_layer_recv;
+    Status val_tcp_send;
+    Status val_tcp_recv;
     int flag_trans_end = false;
     int flag_sleep = true;
 
@@ -1153,19 +1100,19 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
             if(FD_ISSET(client_fd, &wfds)){
                 FD_CLR(client_fd, &wfds);
                 if (0 != memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE)) {
-                    val_physical_layer_send = physical_layer_send(client_fd, buffer);
+                    val_tcp_send = tcp_send(client_fd, buffer);
 
                 }
                 else {  //transmission end
                     LOG(Info) << "[SPL] Transmission end, detected by SPL" << endl;
-                    val_physical_layer_send = physical_layer_send(client_fd, buffer, true, true);
+                    val_tcp_send = tcp_send(client_fd, buffer, true, true);
                     flag_trans_end = true;
                 }
             }
-            LOG(Debug) << "[SPL] val_physical_layer_send\t" << val_physical_layer_send << endl;
-            if (val_physical_layer_send < 0) {
-                LOG(Error) << "[SPL] An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
-                return val_physical_layer_send;
+            LOG(Debug) << "[SPL] val_tcp_send\t" << val_tcp_send << endl;
+            if (val_tcp_send < 0) {
+                LOG(Error) << "[SPL] An error occured, val_tcp_send code: " << val_tcp_send << endl;
+                return val_tcp_send;
             }
         }//end of if read > 0
 
@@ -1179,12 +1126,12 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
             if(FD_ISSET(client_fd, &rfds)){
                 FD_CLR(client_fd, &rfds);
                 //expecting to recv ACK/NAK
-                val_physical_layer_recv = physical_layer_recv(client_fd, buffer, false);
+                val_tcp_recv = tcp_recv(client_fd, buffer, false);
                 //nothing received
-                if(val_physical_layer_recv == E_RECV)   
+                if(val_tcp_recv == E_RECV)   
                     continue;
                 //other error: ignore this packet
-                else if(val_physical_layer_recv < 0)
+                else if(val_tcp_recv < 0)
                     continue;
 
                 else{    //recved frame from receiver: ACK/NAK
@@ -1254,6 +1201,10 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
         return server_fd;
     }
 
+    int flags;
+    flags = fcntl(server_fd, F_GETFL, 0);
+    fcntl(server_fd, F_SETFL, flags | O_NONBLOCK);
+
     close(pipefd_up[p_read]);
     if(pipefd_down)
         close(pipefd_down[p_write]);
@@ -1261,8 +1212,8 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
     int r_rtn, w_rtn;
     frame s;
     char buffer[LEN_PKG_DATA] = {0};   
-    Status val_physical_layer_recv;
-    Status val_physical_layer_send;
+    Status val_tcp_recv;
+    Status val_tcp_send;
     int flag_trans_end = false;
     int flag_sleep = true;
 
@@ -1277,13 +1228,13 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
         }
         if(FD_ISSET(server_fd, &rfds)){
             FD_CLR(server_fd, &rfds);
-            val_physical_layer_recv = physical_layer_recv(server_fd, buffer);   //is_data = true
-            LOG(Debug) << "[RPL] val_physical_layer_recv\t" << val_physical_layer_recv << endl;
+            val_tcp_recv = tcp_recv(server_fd, buffer);   //is_data = true
+            LOG(Debug) << "[RPL] val_tcp_recv\t" << val_tcp_recv << endl;
 
             //switch(recv < 0):
             //case(E_RECV): nothing recved, do nothing
             //case(other error): ignore this packet
-            if(val_physical_layer_recv >= 0){
+            if(val_tcp_recv >= 0){
                 flag_sleep = false;
                 LOG(Debug) << "[RPL] Get info from SPL: " << buffer << endl;
 
@@ -1299,7 +1250,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
                 }
                 kill(getppid(), SIGFRARV);
 
-                if (val_physical_layer_recv == TRANSMISSION_END)
+                if (val_tcp_recv == TRANSMISSION_END)
                     flag_trans_end = true;           
             }//end of if recv >= 0
         }
@@ -1325,12 +1276,12 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
                 }
                 if(FD_ISSET(server_fd, &wfds)){
                     FD_CLR(server_fd, &wfds);
-                    val_physical_layer_send = physical_layer_send(server_fd, buffer, false);
-                    LOG(Debug) << "[RPL] val_physical_layer_send\t" << val_physical_layer_send << endl;
+                    val_tcp_send = tcp_send(server_fd, buffer, false);
+                    LOG(Debug) << "[RPL] val_tcp_send\t" << val_tcp_send << endl;
                     
-                    if (val_physical_layer_send < 0) {
-                        LOG(Error) << "[rPL] An error occured, val_physical_layer_send code: " << val_physical_layer_send << endl;
-                        return val_physical_layer_send;
+                    if (val_tcp_send < 0) {
+                        LOG(Error) << "[rPL] An error occured, val_tcp_send code: " << val_tcp_send << endl;
+                        return val_tcp_send;
                     }
                     if(flag_trans_end)
                         break;
