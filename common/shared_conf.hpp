@@ -70,5 +70,8 @@ extern int sig_enable_network_layer;
 extern int sig_timeout;
 extern int sig_ack_timeout;
 
-#define SEND_FILE "rand_1.myfile"
+#define SEND_FILE "rand_100.myfile"
 #define RECV_FILE "recv_1.myfile"
+
+const int timeout_seconds = 0;
+const int timeout_microseconds = 500000;

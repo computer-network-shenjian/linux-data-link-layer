@@ -98,6 +98,7 @@ Status to_physical_layer(frame *s, int *pipefd);
         // 4.ALL_GOOD           no error
         // 5.other Error returns from function: sender_physical_layer
 
+/*
 // timers
 using T_time_seq_nr = typename std::pair<unsigned int, seq_nr>;
 
@@ -105,6 +106,7 @@ using T_time_seq_nr = typename std::pair<unsigned int, seq_nr>;
 const unsigned int tick_interval = 1; // TODO: how long is the actual ticking interval of data/ack packets?
 const unsigned int INTERVAL = 500;
 list<T_time_seq_nr> timer_list;
+*/
 
 // activate clock ticking by pasting the code below
 //
@@ -124,11 +126,16 @@ list<T_time_seq_nr> timer_list;
 //   }
 // }
 
+/*
 void ticking_handler(int sig);
 // this handler is activated every clock tick
 
+void _start_timer(seq_nr k);
+
 void start_timer(seq_nr k) { _start_timer(k); }
 // start a timer for frame k, implementing using a link list to register timers
+
+void _stop_timer(seq_nr k);
 
 void stop_timer(seq_nr k) { _stop_timer(k); }
 //function:
@@ -141,6 +148,7 @@ void start_ack_timer(void) { _start_timer(0xffffffff); }
 void stop_ack_timer(void) { _stop_timer(0xffffffff); }
 //function:
 // stop ACK timer
+*/
 
 void enable_network_layer(void);
 //function:
@@ -223,7 +231,7 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data = tru
 // Postcondition: status number.
     // 1. Transmission ongoing: return ALL_GOOD.
     // 2. Send error: return E_SEND.
-    // 3. Peer disconnected: return E_PEER_DISCONNECTED.
+    // 3. Peer disconnected: return E_PEEROFF.
     // 4. Wrong byte sent: return E_WRONG_BYTE.
 
 Status tcp_recv(const int socket, char *buf_recv, const bool is_data = true);
@@ -240,7 +248,7 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data = true);
     // 1. Transmission ongoing: return ALL_GOOD.
     // 2. Transmission end: return TRANSMISSION_END.
     // 3. Recv error: return E_RECV.
-    // 4. Peer disconnected: return E_PEER_DISCONNECTED.
+    // 4. Peer disconnected: return E_PEEROFF.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
 Status sender_physical_layer(int *pipefd_down, int *pipefd_up);
@@ -264,3 +272,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up);
     // 3. Loop send 1036 bytes to RDL in pipe, each with signal SIGFRARV(frame_arrival).
 // Precondition: pipe.
 // Postcondition: status number.
+
+int ready_to_send(int socketfd);
+
+int ready_to_recv(int socketfd);
