@@ -12,12 +12,18 @@ TARGET_SENDER_TEST := $(SRC_SENDER_TEST:.cpp=)
 TARGET_RECEIVER_TEST := $(SRC_RECEIVER_TEST:.cpp=)
 
 SRC_LIB := common/shared_library.cpp common/Log.cpp
-HEADER_LIB := common/shared_conf.hpp common/status.hpp common/shared_library.hpp
+HEADER_LIB := common/shared_conf.hpp common/status.hpp common/shared_library.hpp common/Log.h
 OBJ_LIB := $(SRC_LIB:.cpp=.o)
 
 RM := rm -f
 
 all: $(OBJ_LIB) $(HEADER_LIB) $(TARGET_SENDER) $(TARGET_RECEIVER)
+
+common/Log.o: common/Log.cpp common/Log.h
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+%.o: %.cpp $(HEADER_LIB)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 %: %.cpp $(OBJ_LIB) $(HEADER_LIB)
 	$(CXX) $(CXXFLAGS) -o $@ $^

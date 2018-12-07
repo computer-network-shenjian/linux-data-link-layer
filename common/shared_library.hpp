@@ -64,7 +64,7 @@ Status receiver_network_layer(int *pipefd);
 /*****************************/
 /*****  Datalink Layer   *****/
 /*****************************/
-void Handler_SIGFRARV(int sig);
+void handler_SIGFRARV(int sig);
 
 void wait_for_event(event_type &event);
 
@@ -177,7 +177,7 @@ int tcp_client_block(const char *ip = "0.0.0.0", const int port = 20350);
     // 3. Peer IP wrong: return E_WRONG_IP.
     // 4. Connect error: return E_CONNECT.
 
-Status physical_layer_send(const int socket, const char *buf_send, const bool is_data = true, const bool is_end = false);
+Status tcp_send(const int socket, const char *buf_send, const bool is_data = true, const bool is_end = false);
 // Intro: Send packages from Sender Physical Level to Receiver Physical Level.
 // Caution: If last package is less than 1036 bytes, SDL should fill '\0' to exact 1036 bytes before send before transmit package to SPL.
 // Function:
@@ -194,7 +194,7 @@ Status physical_layer_send(const int socket, const char *buf_send, const bool is
     // 3. Peer disconnected: return E_PEER_DISCONNECTED.
     // 4. Wrong byte sent: return E_WRONG_BYTE.
 
-Status physical_layer_recv(const int socket, char *buf_recv, const bool is_data = true);
+Status tcp_recv(const int socket, char *buf_recv, const bool is_data = true);
 // Intro: Receive packages to Receiver Physical Level from Sender Physical Level.
 // Caution: If last package is not all empty, but with '\0' at the end, RDL should discard all '\0' at the end.
 // Function:
