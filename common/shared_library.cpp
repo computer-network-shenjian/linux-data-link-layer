@@ -797,7 +797,7 @@ Status receiver_datalink_layer_StopAndWait(int *pipefd) {
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
                 break;
             }
-            P_rtn = to_physical_Layer(&s, pipe_datalink_physical);
+            P_rtn = to_physical_layer(&s, pipe_datalink_physical);
             if(P_rtn < 0)
                 return P_rtn;
         }
