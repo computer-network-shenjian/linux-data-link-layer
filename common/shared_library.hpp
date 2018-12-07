@@ -188,6 +188,9 @@ Status sender_datalink_layer_utopia(int *pipefd);
         // 4.TRANSMISSION_END   transimission end(returned by SPL)
         // 5.ALL_GOOD           no error
         // 6.other Error returns from function: sender_physical_layer
+Status sender_datalink_layer_StopAndWait(int *pipefd);
+
+Status receiver_datalink_layer_StopAndWait(int *pipefd);
 
 Status receiver_datalink_layer_utopia(int *pipefd);
 
