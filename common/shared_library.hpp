@@ -1,3 +1,6 @@
+#ifndef SHARED_LIBRARY_H
+#define SHARED_LIBRARY_H
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -126,6 +129,9 @@ list<T_time_seq_nr> timer_list;
 
 void ticking_handler(int sig);
 // this handler is activated every clock tick
+
+void _start_timer(seq_nr k);
+void _stop_timer(seq_nr k);
 
 void start_timer(seq_nr k) { _start_timer(k); }
 // start a timer for frame k, implementing using a link list to register timers
@@ -264,3 +270,5 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up);
     // 3. Loop send 1036 bytes to RDL in pipe, each with signal SIGFRARV(frame_arrival).
 // Precondition: pipe.
 // Postcondition: status number.
+
+#endif // SHARED_LIBRARY_H

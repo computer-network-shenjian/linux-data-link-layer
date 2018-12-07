@@ -1316,7 +1316,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
 // }
 
 void ticking_handler(int sig) {
-    if (--(*(timer_list.begin()).first) == 0) {
+    if (--((*(timer_list.begin())).first) == 0) {
         timer_list.pop_front();
     }
 }
@@ -1326,6 +1326,6 @@ void _start_timer(seq_nr k) {
 }
 
 void _stop_timer(seq_nr k) {
-    tiemr_list.remove_if([&k](const auto &el) { return el.second == k; } );
+    timer_list.remove_if([&k](const T_time_seq_nr &el) { return el.second == k; } );
 }
 
