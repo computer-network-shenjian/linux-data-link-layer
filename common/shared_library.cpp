@@ -757,11 +757,11 @@ Status RDL_StopAndWait(int *pipefd) {
     int pipe_datalink_physical[2];
 
     if(pipe(pipe_datalink_physical) == -1){
-        LOG(Error) << "[SDL] pipe_datalink_physical init error" << endl;
+        LOG(Error) << "[RDL] pipe_datalink_physical init error." << endl;
         return E_PIPE_INIT;
     }
     if(pipe(pipe_physical_datalink) == -1){
-        LOG(Error) << "[RDL] pipe_physical_datalink init error" << endl;
+        LOG(Error) << "[RDL] pipe_physical_datalink init error." << endl;
         return E_PIPE_INIT;
     }
     
@@ -769,25 +769,25 @@ Status RDL_StopAndWait(int *pipefd) {
     int nPipeReadFlag = fcntl(pipe_datalink_physical[p_write], F_GETFL, 0);
     nPipeReadFlag |= O_NONBLOCK;
     if (fcntl(pipe_datalink_physical[p_write], F_SETFL, nPipeReadFlag) < 0) {
-        LOG(Error) << "[RDL] pipe_datalink_physical set fcntl error" << endl;
+        LOG(Error) << "[RDL] pipe_datalink_physical set fcntl error." << endl;
         return E_PIPE_INIT;
     }
     
     nPipeReadFlag = fcntl(pipe_physical_datalink[p_read], F_GETFL, 0);
     nPipeReadFlag |= O_NONBLOCK;
     if (fcntl(pipe_physical_datalink[p_write], F_SETFL, nPipeReadFlag) < 0) {
-        LOG(Error) << "[RDL] pipe_physical_datalink set fcntl error" << endl;
+        LOG(Error) << "[RDL] pipe_physical_datalink set fcntl error." << endl;
         return E_PIPE_INIT;
     }
 
-    LOG(Info) << "[RDL] pipe init ok" << endl;
+    LOG(Info) << "[RDL] pipe init ok." << endl;
 
     /*********** Pipe init end ***********/
 
     Status rtn = ALL_GOOD;
     pid_t phy_pid = fork();
     if(phy_pid < 0){
-        LOG(Error) << "[RDL] fork unsuccessful" << endl;
+        LOG(Error) << "[RDL] fork unsuccessful." << endl;
         return E_FORK;
     }
 
@@ -803,7 +803,7 @@ Status RDL_StopAndWait(int *pipefd) {
             return rtn;
         }
         else {
-            LOG(Info) << "[RPL] SPL end with success" << endl;
+            LOG(Info) << "[RPL] end with success." << endl;
             return ALL_GOOD;
         } 
     }
@@ -854,11 +854,10 @@ Status RDL_StopAndWait(int *pipefd) {
             }
         }
     }
-    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death" << endl;
+    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death." << endl;
     close(pipefd[p_write]);
 
-    LOG(Info) << "[RDL] RDL test passed!" << endl;
-
+    //LOG(Info) << "[RDL] RDL test passed!" << endl;
     while(1){
         sleep(1);
     }
@@ -877,12 +876,12 @@ Status from_network_layer(packet *p, int *pipefd){
     char pipe_buf[RAW_DATA_SIZE + 1];
     //p_write closed in upper function
     if (read(pipefd[p_read], pipe_buf, RAW_DATA_SIZE) <= 0) {
-        LOG(Error) << "[SDL] read from SNL error." << endl;
+        LOG(Error) << "[DL] read from NL error." << endl;
         return E_PIPE_READ;
     }
     //data starts from data[12]
     memcpy(p->data, pipe_buf, RAW_DATA_SIZE);
-    LOG(Debug) << "[SDL] successfully gets info from SNL."<< endl;
+    LOG(Debug) << "[DL] read from NL successfully."<< endl;
     return ALL_GOOD;
 }        
 
@@ -897,28 +896,21 @@ Status to_physical_layer(frame *s, int *pipefd) {
     memcpy(pipe_buf+8, &(s->ack), sizeof(int));
     memcpy(pipe_buf+12, s->info.data, RAW_DATA_SIZE);
     */
-
     memcpy(pipe_buf, s, LEN_PKG_DATA);
-
-    /*
-    frame frame_buf;
-    memcpy(&frame_buf, pipe_buf, LEN_PKG_DATA);
-    LOG(Debug) << "buffer: seq\t" << frame_buf.seq << "\tkind\t" << frame_buf.kind << endl;
-    */
 
     close(pipefd[p_read]); 
     int w_rtn;
     while(1){
         w_rtn = write(pipefd[p_write], pipe_buf, LEN_PKG_DATA);
         if(w_rtn <= 0 && errno != EAGAIN){
-            LOG(Error) << "[SDL] write to SPL error." << endl;
+            LOG(Error) << "[DL] write to PL error." << endl;
             return E_PIPE_WRITE;
         }
         if(w_rtn > 0)
             break;
         //w_rtn < 0 &&errno == EAGAIN, try again
     }
-    LOG(Debug) << "[SDL] sent frame to SPL successfully." << endl;
+    LOG(Debug) << "[DL] sent frame to PL successfully." << endl;
 
     if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
         return TRANSMISSION_END;
@@ -930,10 +922,10 @@ Status to_physical_layer(frame *s, int *pipefd) {
 Status to_network_layer(packet *p, int *pipefd) {
     //p_read closed in upper function
     if (write(pipefd[p_write], p->data, RAW_DATA_SIZE) <= 0) {
-        LOG(Error) << "[RDL] Pipe write from RDL to RNL error" << endl;
+        LOG(Error) << "[DL] Pipe write to NL error" << endl;
         return E_PIPE_WRITE;
     }
-    LOG(Debug) << "[RDL] send data to RNL successfully."<< endl;
+    LOG(Debug) << "[DL] send data to NL successfully."<< endl;
     return ALL_GOOD;
 }     
 
@@ -944,7 +936,7 @@ Status from_physical_layer(frame *s, int *pipefd) {
     while(1){
         r_rtn = read(pipefd[p_read], pipe_buf, LEN_PKG_DATA);
         if(r_rtn <= 0 && errno != EAGAIN){
-            LOG(Error) << "[RDL] Pipe read from RPL to RDL error" << endl;
+            LOG(Error) << "[DL] Pipe read from PL error" << endl;
             return E_PIPE_WRITE;
         }
         if(r_rtn > 0)
@@ -957,7 +949,7 @@ Status from_physical_layer(frame *s, int *pipefd) {
     memcpy(&(s->ack), pipe_buf+8, sizeof(int));
     memcpy(s->info.data, pipe_buf+12, RAW_DATA_SIZE);
 
-    LOG(Debug) << "[RDL] read frame from RPL successfully." << endl;
+    LOG(Debug) << "[DL] read frame from PL successfully." << endl;
     return ALL_GOOD;
 }    
 
@@ -1160,10 +1152,10 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
         //nonblock
         r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_DATA);
         if(r_rtn <= 0 && errno != EAGAIN){
-            LOG(Error) << "[SPL] Pipe read from SNL to SDL error" << endl;
+            LOG(Error) << "[SPL] Pipe read from SDL error" << endl;
             return E_PIPE_READ;
         }
-        LOG(Debug) << "[SPL] Read info from SNL: " << buffer << endl;
+        LOG(Debug) << "[SPL] Read info from SDL: " << buffer << endl;
         //if r_rtn == -1 and errno == EAGAIN, mean temporarily no data to read, just don't read this time
         if (r_rtn > 0) {
             flag_sleep = false;    
@@ -1213,7 +1205,7 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
 
                 else{    //recved frame from receiver: ACK/NAK
                     flag_sleep = false;
-                    LOG(Debug) << "[SPL] Get info from SPL: " << buffer << endl;
+                    LOG(Debug) << "[SPL] Get info from : " << buffer << endl;
                     
                     /*
                     frame frame_buf;
@@ -1321,12 +1313,12 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
             //case(other error): ignore this packet
             if(val_tcp_recv >= 0){
                 flag_sleep = false;
-                LOG(Debug) << "[RPL] Get info from SPL: " << buffer << endl;
+                LOG(Debug) << "[RPL] Get info from RPL: " << buffer << endl;
 
                 while(1){
                     w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_DATA); 
                     if(w_rtn <= 0 && errno != EAGAIN){
-                        LOG(Error) << "[RPL] Pipe write to SDL error" << endl;
+                        LOG(Error) << "[RPL] Pipe write to RDL error" << endl;
                         return E_PIPE_WRITE;
                     }
                     if(w_rtn > 0)
@@ -1343,7 +1335,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
         if(pipefd_down){
             r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_DATA);
             if(r_rtn <= 0 && errno != EAGAIN){
-                LOG(Error) << "[RPL] Pipe read from SNL to SDL error" << endl;
+                LOG(Error) << "[RPL] Pipe read from RDL error" << endl;
                 return E_PIPE_READ;
             }
             //send ACK
