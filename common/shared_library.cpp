@@ -205,8 +205,10 @@ void wait_for_event(event_type &event) {
             event = ack_timeout;
             break;
         }
-        else
+        else {
+            usleep(10);
             continue;
+        }
     }
     return;
 }
@@ -460,8 +462,7 @@ Status SDL_utopia(int *pipefd) {
     LOG(Info) << "[SDL] pipe_datalink_physical init ok" << endl;
     
     Status rtn = ALL_GOOD;
-    pid_t phy_pid;
-    phy_pid = fork();
+    pid_t phy_pid = fork();
 
     if(phy_pid < 0){
         LOG(Error) << "[SDL] fork unsuccessful" << endl;
@@ -488,7 +489,7 @@ Status SDL_utopia(int *pipefd) {
 
     //datalink layer proc
     else{    
-        //clsoe write port
+        //close write port
         close(pipefd[p_write]);
         frame s;
         packet buffer;
@@ -499,7 +500,9 @@ Status SDL_utopia(int *pipefd) {
             if(rtn == E_PIPE_READ)  
                 return rtn;
 
+            // THINK: does this really make sense?
             s.info = buffer;
+
             rtn = to_physical_layer(&s, pipe_datalink_physical);
             if(rtn < 0)
                 return rtn;
@@ -524,7 +527,7 @@ Status SDL_utopia(int *pipefd) {
 Status RDL_utopia(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    //avoid zonbe proc
+    //avoid zonbie proc
     signal(SIGCHLD, SIG_IGN);
     signal(SIGFRARV, handler_SIGFRARV);
     LOG(Info) << "[RDL] RDL start" << endl;
@@ -578,10 +581,15 @@ Status RDL_utopia(int *pipefd) {
         Status P_rtn, N_rtn;
 
         while(true){
+            // Block until event comes.
             while(true){
                 wait_for_event(event);
-                if(event == frame_arrival)
+                if(event == frame_arrival) {
                     break;
+                }
+                else {
+                    usleep(10);
+                }
             }
 
             P_rtn = from_physical_layer(&r, pipe_physical_datalink);
@@ -613,15 +621,14 @@ Status RDL_utopia(int *pipefd) {
 
 Status SDL_StopAndWait(int *pipefd) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    signal(SIGFRARV, handler_SIGFRARV);
-
     LOG(Info) << "[SDL] SDL start" << endl;
 
-    Status rtn = ALL_GOOD;
+    signal(SIGFRARV, handler_SIGFRARV);
+
+    /*********** Pipe init begin ***********/
+
     int pipe_datalink_physical[2];
     int pipe_physical_datalink[2];
-
-    pid_t phy_pid;
 
     if(pipe(pipe_datalink_physical) == -1){
         LOG(Error) << "[SDL] pipe_datalink_physical init error." << endl;
@@ -649,7 +656,10 @@ Status SDL_StopAndWait(int *pipefd) {
 
     LOG(Info) << "[SDL] pipe init ok" << endl;
 
-    phy_pid = fork();
+    /*********** Pipe init end ***********/
+    
+    Status rtn = ALL_GOOD;
+    pid_t phy_pid = fork();
     if(phy_pid < 0){
         LOG(Error) << "[SDL] fork unsuccessful" << endl;
         return E_FORK;
@@ -675,7 +685,7 @@ Status SDL_StopAndWait(int *pipefd) {
 
     //datalink layer proc
     else{    
-        //clsoe write port
+        //close write port
         close(pipefd[p_write]);
         frame s;
         packet buffer;
@@ -687,19 +697,33 @@ Status SDL_StopAndWait(int *pipefd) {
             if(rtn == E_PIPE_READ)  
                 return rtn;
 
+            // THINK: does this really make sense?
             s.info = buffer;
 
             rtn = to_physical_layer(&s, pipe_datalink_physical);
+            /*
             //detect TRANSMISSION_END
             if(rtn == TRANSMISSION_END)
                 break;
+            */
+
             if(rtn < 0)
                 return rtn;
+            
+            // TODO: check if upper code do or downer code do.
+            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
 
+            // Block until event comes.
             while(true){
                 wait_for_event(event);
-                if(event == frame_arrival)
+                if(event == frame_arrival) {
                     break;
+                }
+                else {
+                    usleep(10);
+                }
             }
         }
 
@@ -718,13 +742,13 @@ Status SDL_StopAndWait(int *pipefd) {
 Status RDL_StopAndWait(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    //avoid zonbe proc
+    //avoid zonbie proc
     signal(SIGCHLD, SIG_IGN);
     signal(SIGFRARV, handler_SIGFRARV);
-
     LOG(Info) << "[RDL] RDL start" << endl;
 
-    Status rtn = ALL_GOOD;
+    /*********** Pipe init begin ***********/
+
     int pipe_physical_datalink[2];
     int pipe_datalink_physical[2];
 
@@ -754,6 +778,9 @@ Status RDL_StopAndWait(int *pipefd) {
 
     LOG(Info) << "[RDL] pipe init ok" << endl;
 
+    /*********** Pipe init end ***********/
+
+    Status rtn = ALL_GOOD;
     pid_t phy_pid = fork();
     if(phy_pid < 0){
         LOG(Error) << "[RDL] fork unsuccessful" << endl;
@@ -788,10 +815,15 @@ Status RDL_StopAndWait(int *pipefd) {
         s.seq = 0xFFFFFFFF;
 
         while(true){
+            // Block until event comes.
             while(true){
                 wait_for_event(event);
-                if(event == frame_arrival)
+                if(event == frame_arrival) {
                     break;
+                }
+                else {
+                    usleep(10);
+                }
             }
 
             P_rtn = from_physical_layer(&r, pipe_physical_datalink);
@@ -802,11 +834,13 @@ Status RDL_StopAndWait(int *pipefd) {
             if(N_rtn < 0)
                 return N_rtn;
             //this must be done afster to_network_layer!!
-            if(P_rtn == TRANSMISSION_END)
-                return TRANSMISSION_END;
+            //if(P_rtn == TRANSMISSION_END)
+                //return TRANSMISSION_END;
+            
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
                 break;
             }
+
             P_rtn = to_physical_layer(&s, pipe_datalink_physical);
             if(P_rtn < 0)
                 return P_rtn;
@@ -1163,7 +1197,7 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
                     //to test if recved ACK/NAK frame
                     r_seq = (unsigned int *)(buffer+4);
                     if((*r_seq) != 0xFFFFFFFF){
-                        LOG(Error) << "[SPL] received unkown frame type!" <<endl;
+                        LOG(Error) << "[SPL] received unknown frame type!" <<endl;
                         continue;
                     }
                     //recognized ACK/NAK
