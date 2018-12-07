@@ -107,7 +107,6 @@ using T_time_seq_nr = typename std::pair<unsigned int, seq_nr>;
 // how many ticks a frame lasts
 const unsigned int tick_interval = 1; // TODO: how long is the actual ticking interval of data/ack packets?
 const unsigned int INTERVAL = 500;
-list<T_time_seq_nr> timer_list;
 
 // activate clock ticking by pasting the code below
 //
@@ -133,18 +132,18 @@ void ticking_handler(int sig);
 void _start_timer(seq_nr k);
 void _stop_timer(seq_nr k);
 
-void start_timer(seq_nr k) { _start_timer(k); }
+void start_timer(seq_nr k);
 // start a timer for frame k, implementing using a link list to register timers
 
-void stop_timer(seq_nr k) { _stop_timer(k); }
+void stop_timer(seq_nr k);
 //function:
 // stop timer of frame k
 
-void start_ack_timer(void) { _start_timer(0xffffffff); }
+void start_ack_timer(void);
 //function:
 // start ACK timer
 
-void stop_ack_timer(void) { _stop_timer(0xffffffff); }
+void stop_ack_timer(void);
 //function:
 // stop ACK timer
 
@@ -185,7 +184,6 @@ Status RDL_utopia(int *pipefd);
 Status receiver_datalink_layer(DProtocol protocol, int *pipefd);
 
 Status RDL_test(int *pipefd);
-
 
 /*****************************/
 /*****  Physical Layer   *****/

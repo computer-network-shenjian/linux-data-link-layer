@@ -1308,6 +1308,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
     return TRANSMISSION_END;
 }
 
+list<T_time_seq_nr> timer_list;
 // template <class T, class t>
 // typename T::iterator find_by_second_in_list(const T &l, const t second) {
 //     // a helper function that finds in list l with element type of pair by the value of 
