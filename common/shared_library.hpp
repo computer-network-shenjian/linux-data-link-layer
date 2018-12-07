@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <list>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -97,20 +98,47 @@ Status to_physical_layer(frame *s, int *pipefd);
         // 4.ALL_GOOD           no error
         // 5.other Error returns from function: sender_physical_layer
 
-void start_timer(seq_nr k);
-//function:
-// start timer of frame k
-// implementation: Link List
+// timers
+using T_time_seq_nr = typename std::pair<unsigned int, seq_nr>;
 
-void stop_timer(seq_nr k);
+// how many ticks a frame lasts
+const unsigned int tick_interval = 1; // TODO: how long is the actual ticking interval of data/ack packets?
+const unsigned int INTERVAL = 500;
+list<T_time_seq_nr> timer_list;
+
+// activate clock ticking by pasting the code below
+//
+// #include <sys/time.h>        /* for setitimer */
+// #include <unistd.h>        /* for pause */
+// #include <signal.h>        /* for signal */
+// if (signal(SIGALRM, ticking_handler) == SIG_ERR) {
+//     perror("Unable to catch SIGALRM");
+//     exit(1);
+//   }
+//   it_val.it_value.tv_sec =     INTERVAL/1000;
+//   it_val.it_value.tv_usec =    (INTERVAL*1000) % 1000000;    
+//   it_val.it_interval = it_val.it_value;
+//   if (setitimer(ITIMER_REAL, &it_val, NULL) == -1) {
+//     perror("error calling setitimer()");
+//     exit(1);
+//   }
+// }
+
+void ticking_handler(int sig);
+// this handler is activated every clock tick
+
+void start_timer(seq_nr k) { _start_timer(k); }
+// start a timer for frame k, implementing using a link list to register timers
+
+void stop_timer(seq_nr k) { _stop_timer(k); }
 //function:
 // stop timer of frame k
 
-void start_ack_timer(void);
+void start_ack_timer(void) { _start_timer(0xffffffff); }
 //function:
 // start ACK timer
 
-void stop_ack_timer(void);
+void stop_ack_timer(void) { _stop_timer(0xffffffff); }
 //function:
 // stop ACK timer
 

@@ -1356,3 +1356,25 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
     }
     return TRANSMISSION_END;
 }
+
+// template <class T, class t>
+// typename T::iterator find_by_second_in_list(const T &l, const t second) {
+//     // a helper function that finds in list l with element type of pair by the value of 
+//     // the second component of its pair elements
+//     return find_if(l.begin(), l.end(), [&first](const auto &p) { return p.first == first; });
+// }
+
+void ticking_handler(int sig) {
+    if (--(*timer_list.begin().first) == 0) {
+        timer_list.pop_front();
+    }
+}
+
+void _start_timer(seq_nr k) {
+    timer_list.emplace_back(tick_interval, k);
+}
+
+void _stop_timer(seq_nr k) {
+    tiemr_list.remove_if([&k](const auto &el) { return el.second == k; } );
+}
+
