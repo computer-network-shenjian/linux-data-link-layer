@@ -23,5 +23,4 @@ const char all_zero[LEN_PKG_DATA+1] = {0};
 
 //#define SEND_FILE "rand_1024.myfile"
 #define SEND_FILE "rand_1.myfile"
-//#define SEND_FILE "README.md"
 #define RECV_FILE "recv_1.myfile"

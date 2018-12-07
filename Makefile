@@ -11,26 +11,18 @@ TARGET_RECEIVER:= $(SRC_RECEIVER:.cpp=)
 TARGET_SENDER_TEST := $(SRC_SENDER_TEST:.cpp=)
 TARGET_RECEIVER_TEST := $(SRC_RECEIVER_TEST:.cpp=)
 
-SRC_LIB := common/shared_library.cpp common/Log.cpp common/shared_conf.hpp common/status.hpp common/shared_library.hpp
+SRC_LIB := common/shared_library.cpp common/Log.cpp
+HEADER_LIB := common/shared_conf.hpp common/status.hpp common/shared_library.hpp
 OBJ_LIB := $(SRC_LIB:.cpp=.o)
 
 RM := rm -f
 
-all: $(TARGET_SENDER) $(TARGET_RECEIVER)
+all: $(OBJ_LIB) $(HEADER_LIB) $(TARGET_SENDER) $(TARGET_RECEIVER)
 
-%: %.cpp $(OBJ_LIB)
+%: %.cpp $(OBJ_LIB) $(HEADER_LIB)
 	$(CXX) $(CXXFLAGS) -o $@ $^
-
-#$(TARGET_RECEIVER): $(SRC_RECEIVER) $(OBJ_LIB)
-#	$(CXX) $(CXXFLAGS) -o $@ $^
 
 test: $(TARGET_SENDER_TEST) $(TARGET_RECEIVER_TEST)
-
-$(TARGET_SENDER_TEST): $(SRC_SENDER_TEST) $(OBJ_LIB)
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-$(TARGET_RECEIVER_TEST): $(SRC_RECEIVER_TEST) $(OBJ_LIB)
-	$(CXX) $(CXXFLAGS) -o $@ $^
 
 clean :
 	$(RM) $(TARGET_SENDER) $(TARGET_RECEIVER) $(TARGET_SENDER_TEST) $(TARGET_RECEIVER_TEST)
