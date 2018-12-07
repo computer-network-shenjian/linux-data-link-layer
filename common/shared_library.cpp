@@ -885,20 +885,19 @@ Status to_physical_layer(frame *s, int *pipefd) {
         memcpy(pipe_buf+8, &(s->ack), sizeof(int));
         memcpy(pipe_buf+12, s->info.data, RAW_DATA_SIZE);
 
-
         close(pipefd[p_read]); 
         int w_rtn;
         while(1){
             w_rtn = write(pipefd[p_write], pipe_buf, LEN_PKG_DATA);
             if(w_rtn <= 0 && errno != EAGAIN){
-                LOG(Error) << "DL write to PL error." << endl;
+                LOG(Error) << "[SDL] write to SPL error." << endl;
                 return E_PIPE_WRITE;
             }
             if(w_rtn > 0)
                 break;
             //w_rtn < 0 &&errno == EAGAIN, try again
         }
-        LOG(Debug) << "DL sent frame to PL successfully." << endl;
+        LOG(Debug) << "[SDL] sent frame to SPL successfully." << endl;
 
         if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
             return TRANSMISSION_END;
@@ -1293,12 +1292,12 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
             //case(other error): ignore this packet
             if(val_tcp_recv >= 0){
                 flag_sleep = false;
-                LOG(Debug) << "[RPL] Get info from RPL: " << buffer << endl;
+                LOG(Debug) << "[RPL] Get info from SPL: " << buffer << endl;
 
                 while(1){
                     w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_DATA); 
                     if(w_rtn <= 0 && errno != EAGAIN){
-                        LOG(Error) << "[RPL] Pipe write to RDL error" << endl;
+                        LOG(Error) << "[RPL] Pipe write to SDL error" << endl;
                         return E_PIPE_WRITE;
                     }
                     if(w_rtn > 0)
@@ -1321,9 +1320,10 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
             //send ACK
             if(r_rtn > 0){
                 flag_sleep = false;
-                // memcpy(buffer, &(s.kind), sizeof(int));
-                // memcpy(buffer+4, &(s.seq), sizeof(int));
-                // memcpy(buffer+8, &(s.ack), sizeof(int));
+                memcpy(buffer, &(s.kind), sizeof(int));
+                memcpy(buffer+4, &(s.seq), sizeof(int));
+                memcpy(buffer+8, &(s.ack), sizeof(int));
+
                 FD_ZERO(&wfds);     
                 FD_SET(server_fd, &wfds);  
                 if((select(server_fd+1, NULL, &wfds, NULL, NULL)) == -1){
