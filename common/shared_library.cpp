@@ -206,7 +206,7 @@ void wait_for_event(event_type &event) {
             break;
         }
         else {
-            usleep(10);
+            usleep(1);
             continue;
         }
     }
@@ -588,7 +588,7 @@ Status RDL_utopia(int *pipefd) {
                     break;
                 }
                 else {
-                    usleep(10);
+                    usleep(1);
                 }
             }
 
@@ -722,7 +722,7 @@ Status SDL_StopAndWait(int *pipefd) {
                     break;
                 }
                 else {
-                    usleep(10);
+                    usleep(1);
                 }
             }
         }
@@ -822,7 +822,7 @@ Status RDL_StopAndWait(int *pipefd) {
                     break;
                 }
                 else {
-                    usleep(10);
+                    usleep(1);
                 }
             }
 
@@ -836,14 +836,18 @@ Status RDL_StopAndWait(int *pipefd) {
             //this must be done afster to_network_layer!!
             //if(P_rtn == TRANSMISSION_END)
                 //return TRANSMISSION_END;
-            
-            if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
-                break;
-            }
+
+            //LOG(Debug) << "seq\t" << s.seq << "\tkind\t" << s.kind << endl;
 
             P_rtn = to_physical_layer(&s, pipe_datalink_physical);
             if(P_rtn < 0)
                 return P_rtn;
+            
+            LOG(Debug) << "[RDL] Send ACK ok!" << endl;
+
+            if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
         }
     }
     LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death" << endl;
@@ -879,31 +883,44 @@ Status from_network_layer(packet *p, int *pipefd){
 }        
 
 Status to_physical_layer(frame *s, int *pipefd) {
-        char pipe_buf[LEN_PKG_DATA+1];
-        memcpy(pipe_buf, &(s->kind), sizeof(int));
-        memcpy(pipe_buf+4, &(s->seq), sizeof(int));
-        memcpy(pipe_buf+8, &(s->ack), sizeof(int));
-        memcpy(pipe_buf+12, s->info.data, RAW_DATA_SIZE);
+    //LOG(Debug) << "to_physical_layer: seq\t" << s->seq << "\tkind\t" << s->kind << endl;
 
-        close(pipefd[p_read]); 
-        int w_rtn;
-        while(1){
-            w_rtn = write(pipefd[p_write], pipe_buf, LEN_PKG_DATA);
-            if(w_rtn <= 0 && errno != EAGAIN){
-                LOG(Error) << "[SDL] write to SPL error." << endl;
-                return E_PIPE_WRITE;
-            }
-            if(w_rtn > 0)
-                break;
-            //w_rtn < 0 &&errno == EAGAIN, try again
-        }
-        LOG(Debug) << "[SDL] sent frame to SPL successfully." << endl;
+    char pipe_buf[LEN_PKG_DATA+1];
+    
+    /*
+    memcpy(pipe_buf, &(s->kind), sizeof(int));
+    memcpy(pipe_buf+4, &(s->seq), sizeof(int));
+    memcpy(pipe_buf+8, &(s->ack), sizeof(int));
+    memcpy(pipe_buf+12, s->info.data, RAW_DATA_SIZE);
+    */
 
-        if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
-            return TRANSMISSION_END;
+    memcpy(pipe_buf, s, LEN_PKG_DATA);
+
+    /*
+    frame frame_buf;
+    memcpy(&frame_buf, pipe_buf, LEN_PKG_DATA);
+    LOG(Debug) << "buffer: seq\t" << frame_buf.seq << "\tkind\t" << frame_buf.kind << endl;
+    */
+
+    close(pipefd[p_read]); 
+    int w_rtn;
+    while(1){
+        w_rtn = write(pipefd[p_write], pipe_buf, LEN_PKG_DATA);
+        if(w_rtn <= 0 && errno != EAGAIN){
+            LOG(Error) << "[SDL] write to SPL error." << endl;
+            return E_PIPE_WRITE;
         }
-        else
-            return ALL_GOOD;
+        if(w_rtn > 0)
+            break;
+        //w_rtn < 0 &&errno == EAGAIN, try again
+    }
+    LOG(Debug) << "[SDL] sent frame to SPL successfully." << endl;
+
+    if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
+        return TRANSMISSION_END;
+    }
+    else
+        return ALL_GOOD;
 }
 
 Status to_network_layer(packet *p, int *pipefd) {
@@ -1033,7 +1050,7 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data, cons
         int val_ready = ready_to_send(socket);
         // if send not ready, sleep 10ms and try again
         if (val_ready < 0) {
-            usleep(5);
+            usleep(1);
             continue;
         }
 
@@ -1072,7 +1089,7 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
         int val_ready = ready_to_recv(socket);
         // if recv not ready, sleep 10ms and try again
         if (val_ready < 0) {
-            usleep(5);
+            usleep(1);
             continue;
         }
 
@@ -1194,12 +1211,20 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
                     flag_sleep = false;
                     LOG(Debug) << "[SPL] Get info from SPL: " << buffer << endl;
                     
+                    /*
+                    frame frame_buf;
+                    memcpy(&frame_buf, buffer, LEN_PKG_DATA);
+                    LOG(Debug) << "seq\t" << frame_buf.seq << "\tkind\t" << frame_buf.kind << endl;
+                    */
+
                     //to test if recved ACK/NAK frame
                     r_seq = (unsigned int *)(buffer+4);
                     if((*r_seq) != 0xFFFFFFFF){
                         LOG(Error) << "[SPL] received unknown frame type!" <<endl;
+                        LOG(Error) << "*r_seq\t" << *r_seq << endl;
                         continue;
                     }
+                    
                     //recognized ACK/NAK
                     //set buffer+12 ~ buffer+1035 all zero
                     memcpy(buffer+12, all_zero, RAW_DATA_SIZE);
@@ -1320,9 +1345,9 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
             //send ACK
             if(r_rtn > 0){
                 flag_sleep = false;
-                memcpy(buffer, &(s.kind), sizeof(int));
-                memcpy(buffer+4, &(s.seq), sizeof(int));
-                memcpy(buffer+8, &(s.ack), sizeof(int));
+                //memcpy(buffer, &(s.kind), sizeof(int));
+                //memcpy(buffer+4, &(s.seq), sizeof(int));
+                //memcpy(buffer+8, &(s.ack), sizeof(int));
 
                 FD_ZERO(&wfds);     
                 FD_SET(server_fd, &wfds);  
@@ -1336,7 +1361,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
                     LOG(Debug) << "[RPL] val_tcp_send\t" << val_tcp_send << endl;
                     
                     if (val_tcp_send < 0) {
-                        LOG(Error) << "[rPL] An error occured, val_tcp_send code: " << val_tcp_send << endl;
+                        LOG(Error) << "[RPL] An error occured, val_tcp_send code: " << val_tcp_send << endl;
                         return val_tcp_send;
                     }
                     if(flag_trans_end)
