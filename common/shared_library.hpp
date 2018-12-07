@@ -136,6 +136,7 @@ void start_timer(seq_nr k);
 // start a timer for frame k, implementing using a link list to register timers
 
 void stop_timer(seq_nr k);
+
 //function:
 // stop timer of frame k
 
@@ -227,7 +228,7 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data = tru
 // Postcondition: status number.
     // 1. Transmission ongoing: return ALL_GOOD.
     // 2. Send error: return E_SEND.
-    // 3. Peer disconnected: return E_PEER_DISCONNECTED.
+    // 3. Peer disconnected: return E_PEEROFF.
     // 4. Wrong byte sent: return E_WRONG_BYTE.
 
 Status tcp_recv(const int socket, char *buf_recv, const bool is_data = true);
@@ -244,7 +245,7 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data = true);
     // 1. Transmission ongoing: return ALL_GOOD.
     // 2. Transmission end: return TRANSMISSION_END.
     // 3. Recv error: return E_RECV.
-    // 4. Peer disconnected: return E_PEER_DISCONNECTED.
+    // 4. Peer disconnected: return E_PEEROFF.
     // 5. Wrong byte sent: return E_WRONG_BYTE. 
 
 Status sender_physical_layer(int *pipefd_down, int *pipefd_up);
@@ -269,4 +270,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up);
 // Precondition: pipe.
 // Postcondition: status number.
 
+int ready_to_send(int socketfd);
+
+int ready_to_recv(int socketfd);
 #endif // SHARED_LIBRARY_H
