@@ -282,3 +282,7 @@ int ready_to_recv(int socketfd);
 Status SPL_noisy(int *pipefd_down, int *pipefd_up, const int noise = 0);
 
 Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise = 0);
+
+Status SPL_new(int *pipe_down, int *pipe_up, const int noise = 0);
+
+Status RPL_new(int *pipe_down, int *pipe_up, const int noise = 0);
