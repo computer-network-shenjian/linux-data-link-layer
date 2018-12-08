@@ -6,12 +6,6 @@
 #define 	SIGENANL	SIGRTMIN+4	//enable_network_layer
 #define 	SIGDISNL	SIGRTMIN+5	//disble_network_layer
 
-#define  MAX_SEQ_1     1
-#define inc_1(k) if(k<MAX_SEQ_1) k++; else k=0;
-
-#define  MAX_SEQ_7     7
-#define inc_7(k) if(k<MAX_SEQ_7) k++; else k=0;
-
 typedef unsigned int seq_nr;    //send seq
 
 
@@ -41,7 +35,7 @@ enum Pipe_RW{
     p_write = 1
 };
 
-typedef enum {
+enum {
     frame_arrival,
     cksum_err,
     timeout,
@@ -49,7 +43,7 @@ typedef enum {
     ack_timeout
 }event_type;
 
-typedef enum {
+enum {
     data,
     ack,
     nak
@@ -65,6 +59,11 @@ struct frame{
     seq_nr     ack;
     packet     info;
 };
+
+enum {
+    simple_timeout,
+    ack_timeout
+}timeout_type;
 
 extern int sig_cksum_err;
 extern int sig_frame_arrival;

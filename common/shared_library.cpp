@@ -6,6 +6,7 @@ int sig_network_layer_ready    =   false;
 int sig_enable_network_layer   =   false;
 int sig_timeout                =   false;
 int sig_ack_timeout            =   false;
+timeout_type timeout_or_ackout  =   simple_timeout;
 
 /*****************************/
 /*****  Network Layer   ******/
@@ -181,6 +182,17 @@ void handler_SIGFRARV(int sig) {
 void handler_SIGCKERR(int sig) {
     if(sig == SIGCKERR)
         sig_cksum_err ++;
+}
+
+void handler_SIGALRM(int sig) {
+    if(sig == SIGALRM) {
+        if (timeout_or_ackout == simple_timeout) {
+            sig_timeout ++;
+        }
+        if (timeout_or_ackout == ack_timeout) {
+            sig_ack_timeout ++;
+        }
+    }
 }
 
 void wait_for_event(event_type &event) {
@@ -881,6 +893,8 @@ Status SDL_noisy_SAW(int *pipefd) {
     LOG(Info) << "[SDL] SDL start" << endl;
 
     signal(SIGFRARV, handler_SIGFRARV);
+    signal(SIGCKERR, handler_SIGCKERR);
+    signal(SIGALRM, handler_SIGALRM);
 
     /*********** Pipe init begin ***********/
 
@@ -949,49 +963,61 @@ Status SDL_noisy_SAW(int *pipefd) {
         packet buffer;
         event_type event;
 
+        rtn = from_network_layer(&buffer, pipefd);
+        if(rtn == E_PIPE_READ)  
+            return rtn;
+
         //enable_network_layer();
         while(true){
-            rtn = from_network_layer(&buffer, pipefd);
-            if(rtn == E_PIPE_READ)  
-                return rtn;
-
             s.info = buffer;
             s.seq = next_frame_to_send;
 
             rtn = to_physical_layer(&s, pipe_datalink_physical);
-            /*
-            //detect TRANSMISSION_END
-            if(rtn == TRANSMISSION_END)
-                break;
-            */
 
             if(rtn < 0)
                 return rtn;
-            
-            // TODO: check if upper code do or downer code do.
-            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
-                break;
-            }
 
-            // Block until event comes.
-            
             start_timer(s.seq);
 
+            // Block until event comes.
             while(true){
                 wait_for_event(event);
                 if(event == frame_arrival) {
                     from_physical_layer(&t, pipe_physical_datalink, false);
                     LOG(Debug) << "[SDL] get ACK" << endl;
+                    // ACK is good.
+                    if (t.ack == next_frame_to_send) {
+                        LOG(Debug) << "[SDL] ack is good!" << endl;
+                        stop_timer(t.ack);
+                        rtn = from_network_layer(&buffer, pipefd);
+                        if(rtn == E_PIPE_READ)  
+                            return rtn;
+                        inc_1(next_frame_to_send);
+                    } else {
+                        LOG(Info) << "[SDL] ack is not good, resend this frame." << endl;
+                    }
                     break;
                 }
+                else if(event == cksum_err) {
+                    LOG(Info) << "[SDL] checksum error, resend this frame." << endl;
+                    break;
+                }
+                else if(event == timeout) {
+                    LOG(Info) << "[SDL] frame timeout and loss, resend this frame." << endl;
+                    break;                    
+                }
+                // other event
                 else {
                     sleep(1);
                 }
             }
             
+            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                LOG(Info) << "[SDL] Transmission end detected" << endl;
+                break;
+            }
         }
 
-        LOG(Info) << "[SDL] Transmission end detected" << endl;
         close(pipefd[p_read]);
         //wait for child to exit
         pid_t wait_pid = waitpid(phy_pid, NULL, 0); //wait for phy_pid exit
@@ -1335,7 +1361,6 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data, cons
 Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
     const unsigned int buf_length = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
     char buffer[LEN_PKG_DATA] = {0};
-
 
     unsigned int total_recv = 0;
     while (total_recv < buf_length) {

@@ -37,6 +37,12 @@ inline void graceful(const char *s, int x) { perror(s); exit(x); }
     LOG((Error)) << s << endl;\
     return((x)); }
 
+#define  MAX_SEQ_1     1
+#define inc_1(k) if(k<MAX_SEQ_1) k++; else k=0;
+
+#define  MAX_SEQ_7     7
+#define inc_7(k) if(k<MAX_SEQ_7) k++; else k=0;
+
 /*****************************/
 /*****  Network Layer   ******/
 /*****************************/
