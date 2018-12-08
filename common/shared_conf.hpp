@@ -71,6 +71,7 @@ extern int sig_network_layer_ready;
 extern int sig_enable_network_layer;
 extern int sig_timeout;
 extern int sig_ack_timeout;
+extern timeout_type timeout_or_ackout;
 
 //#define SEND_FILE "rand_100.myfile"
 //#define SEND_FILE "rand_1.myfile"

@@ -31,3 +31,4 @@ const int E_SELECT = -20;
 const int E_TIMEOUT = -21;
 const int E_NOSEND = E_SEND;
 const int E_NORECV = E_RECV;
+const int E_SETTIMER = -22;

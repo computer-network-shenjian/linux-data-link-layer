@@ -6,7 +6,7 @@ int sig_network_layer_ready    =   false;
 int sig_enable_network_layer   =   false;
 int sig_timeout                =   false;
 int sig_ack_timeout            =   false;
-timeout_type timeout_or_ackout  =   simple_timeout;
+timeout_type timeout_or_ackout =   simple_timeout;
 
 /*****************************/
 /*****  Network Layer   ******/
@@ -182,17 +182,6 @@ void handler_SIGFRARV(int sig) {
 void handler_SIGCKERR(int sig) {
     if(sig == SIGCKERR)
         sig_cksum_err ++;
-}
-
-void handler_SIGALRM(int sig) {
-    if(sig == SIGALRM) {
-        if (timeout_or_ackout == simple_timeout) {
-            sig_timeout ++;
-        }
-        if (timeout_or_ackout == ack_timeout) {
-            sig_ack_timeout ++;
-        }
-    }
 }
 
 void wait_for_event(event_type &event) {
@@ -889,12 +878,26 @@ Status RDL_StopAndWait(int *pipefd) {
 }
 
 Status SDL_noisy_SAW(int *pipefd) {
-    prctl(PR_SET_PDEATHSIG, SIGHUP);
     LOG(Info) << "[SDL] SDL start" << endl;
+
+    /*********** signal init begin ***********/
+
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
 
     signal(SIGFRARV, handler_SIGFRARV);
     signal(SIGCKERR, handler_SIGCKERR);
-    signal(SIGALRM, handler_SIGALRM);
+    signal(SIGALRM, ticking_handler);
+
+    itimerval it_val;
+    it_val.it_value.tv_sec = INTERVAL/1000;
+    it_val.it_value.tv_usec = (INTERVAL*1000) % 1000000;
+    it_val.it_interval = it_val.it_value;
+    if (setitimer(ITIMER_REAL, &it_val, NULL) == -1) {
+        LOG(Error) << "[SDL]error calling setitimer()" << endl;
+        return E_SETTIMER;
+    }
+
+    /*********** signal init end ***********/
 
     /*********** Pipe init begin ***********/
 
@@ -1750,6 +1753,7 @@ void ticking_handler(int sig) {
     if (--((*(timer_list.begin())).first) == 0) {
         timer_list.pop_front();
 	// TODO: send a signal to this process here
+
     }
 }
 
@@ -1762,6 +1766,7 @@ void _stop_timer(seq_nr k) {
 }
 
 void start_timer(seq_nr k) {
+    timeout_or_ackout = simple_timeout;
     _start_timer(k);	
 }
 
@@ -1770,6 +1775,7 @@ void stop_timer(seq_nr k) {
 }
 
 void start_ack_timer(void) {
+    timeout_or_ackout = ack_timeout;
     _start_timer(0xffffffff);
 }
 

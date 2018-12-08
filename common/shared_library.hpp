@@ -132,7 +132,6 @@ const unsigned int INTERVAL = 500;
 //     perror("error calling setitimer()");
 //     exit(1);
 //   }
-// }
 
 void ticking_handler(int sig);
 // this handler is activated every clock tick
