@@ -814,6 +814,7 @@ Status RDL_StopAndWait(int *pipefd) {
         frame r, s;
         event_type event;
         Status P_rtn, N_rtn;
+        int sleep_cnt = 0;
 
         s.kind = ack;
         s.seq = 0xFFFFFFFF;
@@ -851,6 +852,11 @@ Status RDL_StopAndWait(int *pipefd) {
 
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
                 break;
+            }
+            sleep_cnt ++;
+            if(sleep_cnt >= 10){
+                sleep_cnt = 0;
+                usleep(1);
             }
         }
     }
