@@ -59,19 +59,19 @@ struct frame{
     seq_nr     ack;
     packet     info;
 };
-
+/*
 enum {
     simple_timeout,
     ack_timeout
 }timeout_type;
-
+*/
 extern int sig_cksum_err;
 extern int sig_frame_arrival;
 extern int sig_network_layer_ready;
 extern int sig_enable_network_layer;
 extern int sig_timeout;
 extern int sig_ack_timeout;
-extern timeout_type timeout_or_ackout;
+//extern timeout_type timeout_or_ackout;
 
 //#define SEND_FILE "rand_100.myfile"
 //#define SEND_FILE "rand_1.myfile"

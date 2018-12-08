@@ -6,7 +6,7 @@ int sig_network_layer_ready    =   false;
 int sig_enable_network_layer   =   false;
 int sig_timeout                =   false;
 int sig_ack_timeout            =   false;
-timeout_type timeout_or_ackout =   simple_timeout;
+//timeout_type timeout_or_ackout =   simple_timeout;
 
 /*****************************/
 /*****  Network Layer   ******/
@@ -533,7 +533,7 @@ Status SDL_utopia(int *pipefd) {
 Status RDL_utopia(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    //avoid zonbie proc
+    //avoid zombie proc
     signal(SIGCHLD, SIG_IGN);
     signal(SIGFRARV, handler_SIGFRARV);
     LOG(Info) << "[RDL] RDL start" << endl;
@@ -752,7 +752,7 @@ Status SDL_StopAndWait(int *pipefd) {
 Status RDL_StopAndWait(int *pipefd) {
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    //avoid zonbie proc
+    //avoid zombie proc
     signal(SIGCHLD, SIG_IGN);
     signal(SIGFRARV, handler_SIGFRARV);
     LOG(Info) << "[RDL] RDL start" << endl;
@@ -1033,12 +1033,18 @@ Status SDL_noisy_SAW(int *pipefd) {
 }
 
 Status RDL_noisy_SAW(int *pipefd) {
+    LOG(Info) << "[RDL] RDL start" << endl;
+
+    /*********** signal init begin ***********/
+
     //exit when father proc exit
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    //avoid zonbie proc
+    //avoid zombie proc
     signal(SIGCHLD, SIG_IGN);
     signal(SIGFRARV, handler_SIGFRARV);
-    LOG(Info) << "[RDL] RDL start" << endl;
+    signal(SIGCKERR, handler_SIGCKERR);
+    
+    /*********** signal init end ***********/
 
     /*********** Pipe init begin ***********/
 
@@ -1102,9 +1108,12 @@ Status RDL_noisy_SAW(int *pipefd) {
         int rand_for_ack_delay;
         srand( (unsigned)time( NULL ) ); 
         close(pipefd[p_read]);
+        
+        seq_nr frame_expected = 0;
         frame r, s;
         event_type event;
         Status P_rtn, N_rtn;
+        
 
         s.kind = ack;
         s.seq = 0xFFFFFFFF;
@@ -1751,9 +1760,12 @@ list<T_time_seq_nr> timer_list;
 
 void ticking_handler(int sig) {
     if (timer_list.size() && (--((*(timer_list.begin())).first) == 0)) {
+        if (timer_list.second == 0xffffffff) {
+            sig_ack_timeout++;
+        } else {
+            sig_timeout++;
+        }
         timer_list.pop_front();
-	// TODO: send a signal to this process here
-
     }
 }
 
