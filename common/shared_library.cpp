@@ -814,7 +814,6 @@ Status RDL_StopAndWait(int *pipefd) {
         frame r, s;
         event_type event;
         Status P_rtn, N_rtn;
-        int sleep_cnt = 0;
 
         s.kind = ack;
         s.seq = 0xFFFFFFFF;
@@ -852,11 +851,6 @@ Status RDL_StopAndWait(int *pipefd) {
 
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
                 break;
-            }
-            sleep_cnt ++;
-            if(sleep_cnt >= 10){
-                sleep_cnt = 0;
-                usleep(1);
             }
         }
     }
@@ -1276,6 +1270,8 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
 
 Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
+    srand( (unsigned)time( NULL ) ); 
+
     fd_set rfds, wfds;
     int server_fd = tcp_server_block();
     LOG(Debug) << "[RPL] server_fd\t" << server_fd << endl;
@@ -1299,6 +1295,7 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
     Status val_tcp_send;
     int flag_trans_end = false;
     int flag_sleep = true;
+    int rand_for_ack_delay;
 
     while(1) {
         flag_sleep = true;
@@ -1350,6 +1347,10 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
                 //memcpy(buffer, &(s.kind), sizeof(int));
                 //memcpy(buffer+4, &(s.seq), sizeof(int));
                 //memcpy(buffer+8, &(s.ack), sizeof(int));
+
+                rand_for_ack_delay = rand() % 100;
+                if(rand_for_ack_delay < 10)
+                    usleep(1);
 
                 FD_ZERO(&wfds);     
                 FD_SET(server_fd, &wfds);  
