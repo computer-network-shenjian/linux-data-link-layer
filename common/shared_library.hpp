@@ -85,11 +85,11 @@ Status to_network_layer(packet *p, int *pipefd);
 //function:
 //      RDL send packet to RNL
 
-Status from_physical_layer(frame *s, int *pipefd);
+Status from_physical_layer(frame *s, int *pipefd, bool is_data = true);
 //function:
 //      RDL gets frame from RPL
 
-Status to_physical_layer(frame *s, int *pipefd);
+Status to_physical_layer(frame *s, int *pipefd, bool is_data = true);
 //function:
 //      SDL send packet to SPL
 //precondition:

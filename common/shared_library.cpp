@@ -720,7 +720,7 @@ Status SDL_StopAndWait(int *pipefd) {
             while(true){
                 wait_for_event(event);
                 if(event == frame_arrival) {
-                    from_physical_layer(&trash, pipe_physical_datalink);
+                    from_physical_layer(&trash, pipe_physical_datalink, false);
                     LOG(Debug) << "[SDL] get ACK and trashed" << endl;
                     break;
                 }
@@ -810,6 +810,8 @@ Status RDL_StopAndWait(int *pipefd) {
 
     //datalink layer proc
     else{
+        int rand_for_ack_delay;
+        srand( (unsigned)time( NULL ) ); 
         close(pipefd[p_read]);
         frame r, s;
         event_type event;
@@ -843,10 +845,15 @@ Status RDL_StopAndWait(int *pipefd) {
 
             //LOG(Debug) << "seq\t" << s.seq << "\tkind\t" << s.kind << endl;
 
-            P_rtn = to_physical_layer(&s, pipe_datalink_physical);
+            rand_for_ack_delay = rand() % 100;
+            if(rand_for_ack_delay < 10) {
+                usleep(1);
+            }
+
+            P_rtn = to_physical_layer(&s, pipe_datalink_physical, false);
             if(P_rtn < 0)
                 return P_rtn;
-            
+
             LOG(Debug) << "[RDL] Send ACK" << endl;
 
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
@@ -885,23 +892,17 @@ Status from_network_layer(packet *p, int *pipefd){
     return ALL_GOOD;
 }        
 
-Status to_physical_layer(frame *s, int *pipefd) {
+Status to_physical_layer(frame *s, int *pipefd, bool is_data) {
     //LOG(Debug) << "to_physical_layer: seq\t" << s->seq << "\tkind\t" << s->kind << endl;
-
+    unsigned int write_len = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
     char pipe_buf[LEN_PKG_DATA+1];
     
-    /*
-    memcpy(pipe_buf, &(s->kind), sizeof(int));
-    memcpy(pipe_buf+4, &(s->seq), sizeof(int));
-    memcpy(pipe_buf+8, &(s->ack), sizeof(int));
-    memcpy(pipe_buf+12, s->info.data, RAW_DATA_SIZE);
-    */
-    memcpy(pipe_buf, s, LEN_PKG_DATA);
+    memcpy(pipe_buf, s, write_len);
 
     close(pipefd[p_read]); 
     int w_rtn;
     while(1){
-        w_rtn = write(pipefd[p_write], pipe_buf, LEN_PKG_DATA);
+        w_rtn = write(pipefd[p_write], pipe_buf, write_len);
         if(w_rtn <= 0 && errno != EAGAIN){
             LOG(Error) << "[DL] write to PL error." << endl;
             return E_PIPE_WRITE;
@@ -912,11 +913,12 @@ Status to_physical_layer(frame *s, int *pipefd) {
     }
     LOG(Debug) << "[DL] sent frame to PL successfully." << endl;
 
-    if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE)) {
+    if (0 == memcmp(pipe_buf, all_zero, RAW_DATA_SIZE) && is_data) {
         return TRANSMISSION_END;
     }
-    else
+    else {
         return ALL_GOOD;
+    }
 }
 
 Status to_network_layer(packet *p, int *pipefd) {
@@ -929,12 +931,13 @@ Status to_network_layer(packet *p, int *pipefd) {
     return ALL_GOOD;
 }     
 
-Status from_physical_layer(frame *s, int *pipefd) {
+Status from_physical_layer(frame *s, int *pipefd, bool is_data) {
+    unsigned int read_len = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
     char pipe_buf[LEN_PKG_DATA+1] = {0};
     close(pipefd[p_write]); 
     int r_rtn;
     while(1){
-        r_rtn = read(pipefd[p_read], pipe_buf, LEN_PKG_DATA);
+        r_rtn = read(pipefd[p_read], pipe_buf, read_len);
         if(r_rtn <= 0 && errno != EAGAIN){
             LOG(Error) << "[DL] Pipe read from PL error" << endl;
             return E_PIPE_WRITE;
@@ -943,11 +946,13 @@ Status from_physical_layer(frame *s, int *pipefd) {
             break;
         //r_rtn < 0 &&errno == EAGAIN, try again
     }
-    
+    /*
     memcpy(&(s->kind), pipe_buf, sizeof(int));
     memcpy(&(s->seq), pipe_buf+4, sizeof(int));
     memcpy(&(s->ack), pipe_buf+8, sizeof(int));
     memcpy(s->info.data, pipe_buf+12, RAW_DATA_SIZE);
+    */
+    memcpy(s, pipe_buf, read_len);
 
     LOG(Debug) << "[DL] read frame from PL successfully." << endl;
     return ALL_GOOD;
@@ -1139,7 +1144,7 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
     }
 
     int r_rtn, w_rtn;
-    unsigned int *r_seq;
+    //unsigned int *r_seq;
     frame r;
     char buffer[LEN_PKG_DATA] = {0};
     Status val_tcp_send;
@@ -1212,7 +1217,7 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
                     memcpy(&frame_buf, buffer, LEN_PKG_DATA);
                     LOG(Debug) << "seq\t" << frame_buf.seq << "\tkind\t" << frame_buf.kind << endl;
                     */
-
+                    /*
                     //to test if recved ACK/NAK frame
                     r_seq = (unsigned int *)(buffer+4);
                     if((*r_seq) != 0xFFFFFFFF){
@@ -1220,12 +1225,13 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
                         LOG(Error) << "*r_seq\t" << *r_seq << endl;
                         continue;
                     }
-                    
+                    */
                     //recognized ACK/NAK
                     //set buffer+12 ~ buffer+1035 all zero
-                    memcpy(buffer+12, all_zero, RAW_DATA_SIZE);
+                    //memcpy(buffer+12, all_zero, RAW_DATA_SIZE);
                     while(1){
-                        w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_DATA);
+                        //w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_DATA);
+                        w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_NODATA);
                         if(w_rtn <= 0 && errno != EAGAIN){
                             LOG(Error) << "[SPL] Pipe write to SDL error" << endl;
                             return E_PIPE_WRITE;
@@ -1270,7 +1276,6 @@ Status sender_physical_layer(int *pipefd_down, int *pipefd_up) {
 
 Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
     prctl(PR_SET_PDEATHSIG, SIGHUP);
-    srand( (unsigned)time( NULL ) ); 
 
     fd_set rfds, wfds;
     int server_fd = tcp_server_block();
@@ -1295,7 +1300,6 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
     Status val_tcp_send;
     int flag_trans_end = false;
     int flag_sleep = true;
-    int rand_for_ack_delay;
 
     while(1) {
         flag_sleep = true;
@@ -1336,7 +1340,8 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
         }
 
         if(pipefd_down){
-            r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_DATA);
+            //r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_DATA);
+            r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_NODATA);
             if(r_rtn <= 0 && errno != EAGAIN){
                 LOG(Error) << "[RPL] Pipe read from RDL error" << endl;
                 return E_PIPE_READ;
@@ -1344,13 +1349,6 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
             //send ACK
             if(r_rtn > 0){
                 flag_sleep = false;
-                //memcpy(buffer, &(s.kind), sizeof(int));
-                //memcpy(buffer+4, &(s.seq), sizeof(int));
-                //memcpy(buffer+8, &(s.ack), sizeof(int));
-
-                rand_for_ack_delay = rand() % 100;
-                if(rand_for_ack_delay < 10)
-                    usleep(1);
 
                 FD_ZERO(&wfds);     
                 FD_SET(server_fd, &wfds);  
