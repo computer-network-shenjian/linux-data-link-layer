@@ -1749,6 +1749,7 @@ list<T_time_seq_nr> timer_list;
 void ticking_handler(int sig) {
     if (--((*(timer_list.begin())).first) == 0) {
         timer_list.pop_front();
+	// TODO: send a signal to this process here
     }
 }
 
