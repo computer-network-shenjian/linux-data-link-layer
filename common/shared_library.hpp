@@ -278,3 +278,7 @@ int ready_to_send(int socketfd);
 
 int ready_to_recv(int socketfd);
 #endif // SHARED_LIBRARY_H
+
+Status SPL_noisy(int *pipefd_down, int *pipefd_up, const int noise = 0);
+
+Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise = 0);

@@ -950,7 +950,7 @@ Status SDL_noisy_SAW(int *pipefd) {
     //physical layer proc
     else if(phy_pid == 0){
         prctl(PR_SET_PDEATHSIG, SIGHUP);
-        rtn = sender_physical_layer(pipe_datalink_physical, pipe_physical_datalink);
+        rtn = SPL_noisy(pipe_datalink_physical, pipe_physical_datalink, error_rate);
         if(rtn == TRANSMISSION_END){
             LOG(Info) << "sender: Transmission end in SDL." << endl;
             return rtn;
@@ -1011,18 +1011,20 @@ Status SDL_noisy_SAW(int *pipefd) {
                         return rtn;
                     }
                     inc_1(next_frame_to_send);
-                }
-                else {
+                } else {
                     LOG(Info) << "[SDL] ack is not good, resend this frame." << endl;
                 }
+                continue;
             }
 
             if(event == cksum_err) {
                 LOG(Info) << "[SDL] checksum error, resend this frame." << endl;
+                continue;
             }
 
             if(event == timeout) {
-                LOG(Info) << "[SDL] frame timeout and loss, resend this frame." << endl;                    
+                LOG(Info) << "[SDL] frame timeout and loss, resend this frame." << endl;
+                continue;                
             }
         }
 
@@ -1093,7 +1095,7 @@ Status RDL_noisy_SAW(int *pipefd) {
 
     //physical layer proc 
     else if(phy_pid == 0){
-        rtn = receiver_physical_layer(pipe_datalink_physical, pipe_physical_datalink);
+        rtn = RPL_noisy(pipe_datalink_physical, pipe_physical_datalink, error_rate);
 
         if(rtn < 0){
             LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
@@ -1107,8 +1109,6 @@ Status RDL_noisy_SAW(int *pipefd) {
 
     //datalink layer proc
     else{
-        int rand_for_ack_delay;
-        srand( (unsigned)time( NULL ) ); 
         close(pipefd[p_read]);
         
         seq_nr frame_expected = 0;
@@ -1123,6 +1123,7 @@ Status RDL_noisy_SAW(int *pipefd) {
             // Block until event comes.
             wait_for_event(event);
             if (event == frame_arrival) {
+                LOG(Debug) << "[RDL] frame arrive" << endl;
                 P_rtn = from_physical_layer(&r, pipe_physical_datalink);
                 if(P_rtn < 0)
                     return P_rtn;
@@ -1137,13 +1138,6 @@ Status RDL_noisy_SAW(int *pipefd) {
 
                 s.ack = 1-frame_expected;
 
-                /*
-                rand_for_ack_delay = rand() % 100;
-                if(rand_for_ack_delay < 10) {
-                    usleep(1);
-                }
-                */
-
                 P_rtn = to_physical_layer(&s, pipe_datalink_physical, false);
                 if(P_rtn < 0)
                     return P_rtn;
@@ -1152,7 +1146,7 @@ Status RDL_noisy_SAW(int *pipefd) {
             }
 
             if (event == cksum_err) {
-                LOG(Info) << "[RDL] checksum error, reaccept this frame." << endl;
+                LOG(Info) << "[RDL] checksum error, reaccept this frame" << endl;
                 continue;
             }
 
@@ -1398,6 +1392,7 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
         }
         else {
             total_recv += val_recv;
+            cout << "val_recv\t" << val_recv << "total_recv" << total_recv << endl;
         }
     }
     
@@ -1713,7 +1708,7 @@ int ready_to_send(int socketfd) {
     */
     else if (FD_ISSET(socketfd, &writefds)){
         FD_CLR(socketfd, &writefds);
-        LOG(Debug) << "[tcp] ready to send" << endl;
+        LOG(Debug) << "[tcp] ready to send OK!" << endl;
         FD_ZERO(&writefds);
         return ALL_GOOD;
     }
@@ -1743,7 +1738,7 @@ int ready_to_recv(int socketfd) {
     }
     else if (FD_ISSET(socketfd, &readfds)){
         FD_CLR(socketfd, &readfds);
-        LOG(Debug) << "[tcp] ready to recv" << endl;
+        LOG(Debug) << "[tcp] ready to recv OK!" << endl;
         FD_ZERO(&readfds);
         return ALL_GOOD;
     }
@@ -1788,4 +1783,310 @@ void start_ack_timer(void) {
 
 void stop_ack_timer(void) {
     _stop_timer(0xffffffff);	
+}
+
+Status SPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
+    srand( (unsigned)time( NULL ) );
+    int random_num = 0;
+
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    fd_set rfds, wfds;
+    int client_fd = tcp_client_block();
+    LOG(Debug) << "[SPL] client_fd\t" << client_fd << endl;
+    if (client_fd < 0) {
+        LOG(Error) << "[SPL] An error occured when initializing TCP client socoket or connect with error code: " << client_fd << endl;
+        return client_fd;
+    }
+
+    int flags;
+    flags = fcntl(client_fd, F_GETFL, 0);
+    fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+
+    close(pipefd_down[p_write]);
+    if(pipefd_up) {
+        close(pipefd_up[p_read]);
+    }
+
+    int r_rtn, w_rtn;
+    //unsigned int *r_seq;
+    frame r;
+    char buffer[LEN_PKG_DATA] = {0};
+    Status val_tcp_send;
+    Status val_tcp_recv;
+    int flag_trans_end = false;
+    int flag_sleep = true;
+
+    while(1) {
+        flag_sleep = true;
+        //nonblock
+        r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_DATA);
+        if(r_rtn <= 0 && errno != EAGAIN){
+            LOG(Error) << "[SPL] Pipe read from SDL error" << endl;
+            return E_PIPE_READ;
+        }
+        LOG(Debug) << "[SPL] Read info from SDL: " << buffer << endl;
+        //if r_rtn == -1 and errno == EAGAIN, mean temporarily no data to read, just don't read this time
+        if (r_rtn > 0) {
+            flag_sleep = false;    
+
+            FD_ZERO(&wfds);     
+            FD_SET(client_fd, &wfds);  
+            if((select(client_fd+1, NULL, &wfds, NULL, NULL)) == -1){
+                LOG(Error) << "[SPL] An error occured, select error." <<endl;
+                return E_SELECT;
+            }
+            if(FD_ISSET(client_fd, &wfds)){
+                FD_CLR(client_fd, &wfds);
+                if (0 != memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE)) {
+                    val_tcp_send = tcp_send(client_fd, buffer);
+
+                }
+                else {  //transmission end
+                    LOG(Info) << "[SPL] Transmission end, detected by SPL" << endl;
+                    val_tcp_send = tcp_send(client_fd, buffer, true, true);
+                    flag_trans_end = true;
+                }
+            }
+            LOG(Debug) << "[SPL] val_tcp_send\t" << val_tcp_send << endl;
+            if (val_tcp_send < 0) {
+                LOG(Error) << "[SPL] An error occured, val_tcp_send code: " << val_tcp_send << endl;
+                return val_tcp_send;
+            }
+        }//end of if read > 0
+
+        if(pipefd_up){
+            FD_ZERO(&rfds);     
+            FD_SET(client_fd, &rfds);  
+            if((select(client_fd+1, &rfds, NULL, NULL, NULL)) == -1){
+                LOG(Info) << "[SPL] An error occured, select error." <<endl;
+                return E_SELECT;
+            }
+            if(FD_ISSET(client_fd, &rfds)){
+                FD_CLR(client_fd, &rfds);
+                //expecting to recv ACK/NAK
+                val_tcp_recv = tcp_recv(client_fd, buffer, false);
+
+                //nothing received
+                if(val_tcp_recv == E_RECV)   
+                    continue;
+                //other error: ignore this packet
+                else if(val_tcp_recv < 0)
+                    continue;
+
+                else{    //recved frame from receiver: ACK/NAK
+                    flag_sleep = false;
+                    LOG(Info) << "[SPL] get ACK" << endl;
+                    random_num = rand() % 100;
+                    // toss ACK and send SIGCKERR.
+                    if (random_num < noise) {
+                        LOG(Info) << "[SPL] toss ACK and send SIGCKERR" << endl;
+                        kill(getppid(), SIGCKERR);
+                        continue;
+                    }
+                    // toss ACK and do nothing.
+                    if (random_num > 99-noise) {
+                        LOG(Info) << "[SPL] toss ACK and do nothing" << endl;
+                        continue;
+                    }
+                    // no toss
+                    while(1){
+                        w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_NODATA);
+                        if(w_rtn <= 0 && errno != EAGAIN){
+                            LOG(Error) << "[SPL] Pipe write to SDL error" << endl;
+                            return E_PIPE_WRITE;
+                        }
+                        if(w_rtn > 0)
+                            break;
+                        //w_rtn < 0 &&errno == EAGAIN, try again
+                    }
+                    kill(getppid(), SIGFRARV);
+                }//end of else
+            }
+            //after recv ACK
+            if(flag_trans_end == true)
+                break;
+        }
+        else
+            if(flag_trans_end == true)
+                break;
+    
+        //if nothing happened in this loop
+        if(flag_sleep == true)
+            sleep(1);
+    }//end of while
+
+    //detected transmission_end
+    close(pipefd_down[p_read]);
+    if(pipefd_up)
+        close(pipefd_up[p_write]);
+    // THINK: do we need to sleep here? How long do we need to sleep?
+    //sleep(1);
+    // THINK: can client_fd be closed here?
+    while(1) {
+        if (0 == send(client_fd, NULL, 0, 0)) 
+            break;
+        else 
+            sleep(1);
+    }
+    LOG(Info) << "[SPL] peer(RPL) disconnected detected, SPL will end too." << endl;
+    close(client_fd);
+    return TRANSMISSION_END;
+}
+
+Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
+    srand( (unsigned)time( NULL ) );
+    int random_num = 0;
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+    fd_set rfds, wfds;
+    int server_fd = tcp_server_block();
+    LOG(Debug) << "[RPL] server_fd\t" << server_fd << endl;
+    if (server_fd < 0) {
+        LOG(Error) << "[RPL] An error occured when initializing TCP server socoket or connect with error code: " << server_fd << endl;
+        return server_fd;
+    }
+
+    int flags;
+    flags = fcntl(server_fd, F_GETFL, 0);
+    fcntl(server_fd, F_SETFL, flags | O_NONBLOCK);
+
+    close(pipefd_up[p_read]);
+    if(pipefd_down)
+        close(pipefd_down[p_write]);
+
+    int r_rtn, w_rtn;
+    frame s;
+    char buffer[LEN_PKG_DATA] = {0};   
+    Status val_tcp_recv;
+    Status val_tcp_send;
+    int flag_trans_end = false;
+    int flag_sleep = true;
+
+    while(1) {
+        flag_sleep = true;
+        //nonblock
+        FD_ZERO(&rfds);     
+        FD_SET(server_fd, &rfds);  
+        if((select(server_fd+1, &rfds, NULL, NULL, NULL)) == -1){
+            LOG(Info) << "[RPL] An error occured, select error." <<endl;
+            return E_SELECT;
+        }
+
+        if(FD_ISSET(server_fd, &rfds)){
+            FD_CLR(server_fd, &rfds);
+            val_tcp_recv = tcp_recv(server_fd, buffer);   //is_data = true
+            LOG(Debug) << "[RPL] val_tcp_recv\t" << val_tcp_recv << endl;
+
+            //switch(recv < 0):
+            //case(E_RECV): nothing recved, do nothing
+            //case(other error): ignore this packet
+            if(val_tcp_recv >= 0){
+                flag_sleep = false;
+                LOG(Debug) << "[RPL] Get info from RPL: " << buffer << endl;
+
+                random_num = rand() % 100;
+                // toss frame and send SIGCKERR.
+                if (random_num < noise) {
+                    LOG(Info) << "[RPL] toss frame and send SIGCKERR" << endl;
+                    kill(getppid(), SIGCKERR);
+                    continue;
+                }
+                // toss frame and do nothing.
+                else if (random_num > 99-noise) {
+                    LOG(Info) << "[RPL] toss frame and do nothing" << endl;
+                    continue;
+                }
+
+                while(1){
+                    w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_DATA); 
+                    if(w_rtn <= 0 && errno != EAGAIN){
+                        LOG(Error) << "[RPL] Pipe write to RDL error" << endl;
+                        return E_PIPE_WRITE;
+                    }
+                    if(w_rtn > 0)
+                        break;
+                    //w_rtn < 0 &&errno == EAGAIN, try again
+                }
+                kill(getppid(), SIGFRARV);
+
+                if (val_tcp_recv == TRANSMISSION_END)
+                    flag_trans_end = true;           
+            }//end of if recv >= 0
+        }
+
+        if(pipefd_down){
+            //r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_DATA);
+            r_rtn = read(pipefd_down[p_read], buffer, LEN_PKG_NODATA);
+            if(r_rtn <= 0 && errno != EAGAIN){
+                LOG(Error) << "[RPL] Pipe read from RDL error" << endl;
+                return E_PIPE_READ;
+            }
+            //send ACK
+            if(r_rtn > 0){
+                flag_sleep = false;
+
+                FD_ZERO(&wfds);     
+                FD_SET(server_fd, &wfds);  
+                if((select(server_fd+1, NULL, &wfds, NULL, NULL)) == -1){
+                    LOG(Info) << "[RPL] An error occured, select error." <<endl;
+                    return E_SELECT;
+                }
+                if(FD_ISSET(server_fd, &wfds)){
+                    FD_CLR(server_fd, &wfds);
+                    val_tcp_send = tcp_send(server_fd, buffer, false);
+                    LOG(Debug) << "[RPL] val_tcp_send\t" << val_tcp_send << endl;
+                    
+                    if (val_tcp_send < 0) {
+                        LOG(Error) << "[RPL] An error occured, val_tcp_send code: " << val_tcp_send << endl;
+                        return val_tcp_send;
+                    }
+                    if(flag_trans_end)
+                        break;
+                }
+            }//end of r_rtn > 0
+        }//end of if pipefd_down
+
+        if(flag_trans_end) {
+            break;
+        }
+        //if nothing happened in this loop
+        if(flag_sleep == true)
+            sleep(1);
+    }//end of while
+
+    LOG(Info) << "[RPL] Transmission end, detected by RPL" << endl;
+    close(pipefd_up[p_write]);
+    close(pipefd_down[p_read]);
+    // THINK: can server_fd be closed here?
+    close(server_fd);
+    LOG(Info) << "[RPL] Wait for RDL's death." << endl;
+    while(1) {
+        sleep(1);
+    }
+    return TRANSMISSION_END;
+}
+
+Status SPL_new(int *pipefd_down, int *pipefd_up, const int noise) {
+    /* Preparation for random */
+    srand( (unsigned)time( NULL ) );
+    int random_num = 0;
+
+    /* Other preparations */
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    close(pipefd_down[p_write]);
+    if (pipefd_up) {
+        close(pipefd_up[p_read])
+    }
+    
+    /* To be a client and connect to a server */
+    int client_fd = tcp_client_block();
+    if (client_fd < 0) {
+        LOG(Error) << "[SPL] TCP client init error with code: " << client_fd << endl;
+        return client_fd;
+    }
+
+    /* Claim TCP nonblock */
+    int flags = fcntl(client_fd, F_GETFL, 0);
+    fcntl(client_fd, F_SETFL, flags|O_NONBLOCK);
+
 }
