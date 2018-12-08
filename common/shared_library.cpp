@@ -1482,3 +1482,19 @@ void _start_timer(seq_nr k) {
 void _stop_timer(seq_nr k) {
     timer_list.remove_if([&k](const T_time_seq_nr &el) { return el.second == k; } );
 }
+
+void start_timer(seq_nr k) {
+    _start_timer(k);	
+}
+
+void stop_timer(seq_nr k) {
+    _stop_timer(k);
+}
+
+void start_ack_timer(void) {
+    _start_timer(0xffffffff);
+}
+
+void stop_ack_timer(void) {
+    _stop_timer(0xffffffff);	
+}
