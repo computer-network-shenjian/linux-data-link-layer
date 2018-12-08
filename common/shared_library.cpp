@@ -950,7 +950,7 @@ Status SDL_noisy_SAW(int *pipefd) {
     //physical layer proc
     else if(phy_pid == 0){
         prctl(PR_SET_PDEATHSIG, SIGHUP);
-        rtn = SPL_noisy(pipe_datalink_physical, pipe_physical_datalink, error_rate);
+        rtn = SPL_noisy(pipe_datalink_physical, pipe_physical_datalink, 0);
         if(rtn == TRANSMISSION_END){
             LOG(Info) << "sender: Transmission end in SDL." << endl;
             return rtn;
@@ -984,7 +984,6 @@ Status SDL_noisy_SAW(int *pipefd) {
             s.seq = next_frame_to_send;
 
             rtn = to_physical_layer(&s, pipe_datalink_physical);
-
             if(rtn < 0)
                 return rtn;
 
@@ -1011,20 +1010,18 @@ Status SDL_noisy_SAW(int *pipefd) {
                         return rtn;
                     }
                     inc_1(next_frame_to_send);
-                } else {
-                    LOG(Info) << "[SDL] ack is not good, resend this frame." << endl;
                 }
-                continue;
+                else {
+                    LOG(Info) << "[SDL] ack is\t" << t.ack << "\tnot good, resend this frame." << endl;
+                }
             }
 
             if(event == cksum_err) {
                 LOG(Info) << "[SDL] checksum error, resend this frame." << endl;
-                continue;
             }
 
             if(event == timeout) {
-                LOG(Info) << "[SDL] frame timeout and loss, resend this frame." << endl;
-                continue;                
+                LOG(Info) << "[SDL] frame timeout and loss, resend this frame." << endl;                
             }
         }
 
@@ -1149,7 +1146,6 @@ Status RDL_noisy_SAW(int *pipefd) {
 
             if (event == cksum_err) {
                 LOG(Info) << "[RDL] checksum error, reaccept this frame" << endl;
-                continue;
             }
 
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
@@ -1335,6 +1331,7 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data, cons
         memcpy(buffer, buf_send, buf_length);
     }
 
+    /*
     unsigned int total_send = 0;
     while (total_send < buf_length) {
         int val_ready = ready_to_send(socket);
@@ -1359,7 +1356,10 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data, cons
             total_send += val_send;
         }
     }
+    */
+    send(socket, buffer, buf_length, 0);
     
+    /*
     if (total_send > buf_length) {
         LOG(Error) << "wrong byte sent" << endl;
         return E_WRONG_BYTE;
@@ -1367,12 +1367,15 @@ Status tcp_send(const int socket, const char *buf_send, const bool is_data, cons
     else {
         return ALL_GOOD;
     }
+    */
+    return ALL_GOOD;
 }
 
 Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
     const unsigned int buf_length = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
     char buffer[LEN_PKG_DATA] = {0};
 
+    /*
     unsigned int total_recv = 0;
     while (total_recv < buf_length) {
         int val_ready = ready_to_recv(socket);
@@ -1384,6 +1387,7 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
 
         // recv ready
         int val_recv = recv(socket, buffer, buf_length-total_recv, 0);
+        LOG(Debug) << "DEBUG: val_recv\t" << val_recv << endl;
         if (val_recv < 0) {
             LOG(Error) << "[tcp] recv error" << endl;
             graceful_return("recv", E_RECV);
@@ -1397,11 +1401,16 @@ Status tcp_recv(const int socket, char *buf_recv, const bool is_data) {
             //cout << "val_recv\t" << val_recv << "total_recv" << total_recv << endl;
         }
     }
+    */
+
+    recv(socket, buffer, buf_length, 0);
     
+    /*
     if (total_recv > buf_length) {
         LOG(Error) << "[tcp] wrong byte recv" << endl;
         return E_WRONG_BYTE;
     }
+    */
 
     memcpy(buf_recv, buffer, buf_length);
 
@@ -1663,8 +1672,11 @@ Status receiver_physical_layer(int *pipefd_down, int *pipefd_up) {
             if(flag_trans_end)
                 break;
         //if nothing happened in this loop
-        if(flag_sleep == true)
+        if(flag_sleep == true) {
+            cout << "hello" << endl;
             sleep(1);
+        }
+            
     }//end of while
 
     LOG(Info) << "[RPL] Transmission end, detected by RPL" << endl;
@@ -1841,7 +1853,6 @@ Status SPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
                 FD_CLR(client_fd, &wfds);
                 if (0 != memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE)) {
                     val_tcp_send = tcp_send(client_fd, buffer);
-
                 }
                 else {  //transmission end
                     LOG(Info) << "[SPL] Transmission end, detected by SPL" << endl;
@@ -1899,6 +1910,7 @@ Status SPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
                         }
                         if(w_rtn > 0)
                             break;
+                        cout << "hello" << endl;
                         //w_rtn < 0 &&errno == EAGAIN, try again
                     }
                     kill(getppid(), SIGFRARV);
@@ -1963,15 +1975,24 @@ Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
     Status val_tcp_send;
     int flag_trans_end = false;
     int flag_sleep = true;
+    int no_toss = true;
 
     while(1) {
         flag_sleep = true;
+        no_toss = true;
         //nonblock
         FD_ZERO(&rfds);     
-        FD_SET(server_fd, &rfds);  
-        if((select(server_fd+1, &rfds, NULL, NULL, NULL)) == -1){
+        FD_SET(server_fd, &rfds); 
+        struct timeval tv;
+        tv.tv_sec = timeout_seconds;
+        tv.tv_usec = timeout_microseconds;
+        int val_sel = select(server_fd+1, &rfds, NULL, NULL, &tv);
+        if(val_sel == -1){
             LOG(Info) << "[RPL] An error occured, select error." <<endl;
             return E_SELECT;
+        }
+        else if (val_sel == 0) {
+            cout << "select 1 time out" << endl;
         }
 
         if(FD_ISSET(server_fd, &rfds)){
@@ -1991,28 +2012,30 @@ Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
                 if (random_num < noise) {
                     LOG(Info) << "[RPL] toss frame and send SIGCKERR" << endl;
                     kill(getppid(), SIGCKERR);
-                    continue;
+                    no_toss = false;
                 }
                 // toss frame and do nothing.
                 else if (random_num > 99-noise) {
                     LOG(Info) << "[RPL] toss frame and do nothing" << endl;
-                    continue;
+                    no_toss = false;
                 }
 
-                while(1){
-                    w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_DATA); 
-                    if(w_rtn <= 0 && errno != EAGAIN){
-                        LOG(Error) << "[RPL] Pipe write to RDL error" << endl;
-                        return E_PIPE_WRITE;
+                if (no_toss) {
+                    while(1){
+                        w_rtn = write(pipefd_up[p_write], buffer, LEN_PKG_DATA); 
+                        if(w_rtn <= 0 && errno != EAGAIN){
+                            LOG(Error) << "[RPL] Pipe write to RDL error" << endl;
+                            return E_PIPE_WRITE;
+                        }
+                        if(w_rtn > 0)
+                            break;
+                        //w_rtn < 0 &&errno == EAGAIN, try again
                     }
-                    if(w_rtn > 0)
-                        break;
-                    //w_rtn < 0 &&errno == EAGAIN, try again
+                    kill(getppid(), SIGFRARV);
+                    if (val_tcp_recv == TRANSMISSION_END) {
+                        flag_trans_end = true;
+                    }  
                 }
-                kill(getppid(), SIGFRARV);
-
-                if (val_tcp_recv == TRANSMISSION_END)
-                    flag_trans_end = true;           
             }//end of if recv >= 0
         }
 
@@ -2028,11 +2051,18 @@ Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
                 flag_sleep = false;
 
                 FD_ZERO(&wfds);     
-                FD_SET(server_fd, &wfds);  
-                if((select(server_fd+1, NULL, &wfds, NULL, NULL)) == -1){
+                FD_SET(server_fd, &wfds);
+                tv.tv_sec = timeout_seconds;
+                tv.tv_usec = timeout_microseconds;  
+                val_sel = select(server_fd+1, NULL, &wfds, NULL, NULL);
+                if(val_sel == -1){
                     LOG(Info) << "[RPL] An error occured, select error." <<endl;
                     return E_SELECT;
                 }
+                else if (val_sel == 0) {
+                    cout << "select 2 time out" << endl;
+                }                
+
                 if(FD_ISSET(server_fd, &wfds)){
                     FD_CLR(server_fd, &wfds);
                     val_tcp_send = tcp_send(server_fd, buffer, false);
@@ -2052,8 +2082,10 @@ Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
             break;
         }
         //if nothing happened in this loop
-        if(flag_sleep == true)
-            sleep(1);
+        if(flag_sleep == true) {
+            usleep(10);
+        }
+            
     }//end of while
 
     LOG(Info) << "[RPL] Transmission end, detected by RPL" << endl;
@@ -2295,3 +2327,95 @@ Status RPL_new(int *pipe_down, int *pipe_up, const int noise) {
         }
     }
 }
+
+/*
+Status tcp_send_old(const int socket, const char *buf_send, const bool is_data, const bool is_end) {
+    bool is_data_confirm = is_data | is_end;    // if is_end == true, is_data_confirm must be true.
+    const unsigned int buf_length = is_data_confirm ? LEN_PKG_DATA : LEN_PKG_NODATA;
+    char buffer[LEN_PKG_DATA] = {0};
+    if (is_end) {
+        memcpy(buffer, buf_send, LEN_PKG_NODATA);
+    }
+    else {
+        memcpy(buffer, buf_send, buf_length);
+    }
+
+    unsigned int total_send = 0;
+    while (total_send < buf_length) {
+        int val_ready = ready_to_send(socket);
+        // if send not ready, sleep 10ms and try again
+        if (val_ready < 0) {
+            sleep(1);
+            continue;
+        }
+
+        // send ready
+        errno = 0;
+        int val_send = send(socket, buffer, buf_length-total_send, MSG_NOSIGNAL);
+        if (errno == EPIPE) {
+            LOG(Error) << "[tcp] peer disconnected" << endl;
+            graceful_return("peer disconnected", E_PEEROFF);
+        }
+        else if (val_send < 0) {
+            LOG(Error) << "send error" << endl;
+            graceful_return("send", E_SEND);
+        }
+        else {
+            total_send += val_send;
+        }
+    }
+    
+    if (total_send > buf_length) {
+        LOG(Error) << "wrong byte sent" << endl;
+        return E_WRONG_BYTE;
+    }
+    else {
+        return ALL_GOOD;
+    }
+}
+
+Status tcp_recv_old(const int socket, char *buf_recv, const bool is_data) {
+    const unsigned int buf_length = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
+    char buffer[LEN_PKG_DATA] = {0};
+
+    unsigned int total_recv = 0;
+    while (total_recv < buf_length) {
+        int val_ready = ready_to_recv(socket);
+        // if recv not ready, sleep 10ms and try again
+        if (val_ready < 0) {
+            sleep(1);
+            continue;
+        }
+
+        // recv ready
+        int val_recv = recv(socket, buffer, buf_length-total_recv, 0);
+        LOG(Debug) << "DEBUG: val_recv\t" << val_recv << endl;
+        if (val_recv < 0) {
+            LOG(Error) << "[tcp] recv error" << endl;
+            graceful_return("recv", E_RECV);
+        }
+        if (val_recv == 0) {
+            LOG(Error) << "[tcp] peer disconnected" << endl;
+            graceful_return("peer disconnected", E_PEEROFF);
+        }
+        else {
+            total_recv += val_recv;
+            //cout << "val_recv\t" << val_recv << "total_recv" << total_recv << endl;
+        }
+    }
+    
+    if (total_recv > buf_length) {
+        LOG(Error) << "[tcp] wrong byte recv" << endl;
+        return E_WRONG_BYTE;
+    }
+
+    memcpy(buf_recv, buffer, buf_length);
+
+    if (0 == memcmp(all_zero, buffer+LEN_PKG_NODATA, RAW_DATA_SIZE) && is_data) {
+        return TRANSMISSION_END;
+    }
+    else {
+        return ALL_GOOD;
+    }
+}
+*/

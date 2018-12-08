@@ -84,4 +84,4 @@ const int timeout_microseconds = 50 * 1000; // 50ms
 
 // how many ticks a frame lasts
 const unsigned int tick_s = 2; // s
-const int error_rate = 10; // %
+const int error_rate = 1; // %
