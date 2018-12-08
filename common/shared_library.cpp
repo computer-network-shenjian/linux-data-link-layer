@@ -1030,11 +1030,11 @@ Status SDL_noisy_SAW(int *pipefd) {
 
         close(pipefd[p_read]);
         // no need to wait for child to exit
-        /*
+        
         pid_t wait_pid = waitpid(phy_pid, NULL, 0); //wait for phy_pid exit
         LOG(Debug) << "[SDL] val_waitpid\t" << wait_pid << endl;
         LOG(Info) << "[SDL] SPL end detected" << endl;
-        */
+        
     }//end of else
 
     LOG(Info) << "[SDL] SDL end with success!" << endl;
