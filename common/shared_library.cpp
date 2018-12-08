@@ -1759,12 +1759,14 @@ list<T_time_seq_nr> timer_list;
 // }
 
 void ticking_handler(int sig) {
-    if (timer_list.size() && (--((*(timer_list.begin())).first) == 0)) {
-        if (timer_list.second == 0xffffffff) {
-            sig_ack_timeout++;
-        } else {
+    auto &next_timer = *timer_list.begin();
+    if (!timer_list.empty() && (--next_timer.first == 0)) {
+	if (next_timer.second == 0xffffffff) {
+	    // ack packet
+	    sig_ack_timeout++;
+	} else {
             sig_timeout++;
-        }
+	}
         timer_list.pop_front();
     }
 }
