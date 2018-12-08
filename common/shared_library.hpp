@@ -20,6 +20,7 @@
 #include <sys/prctl.h>
 #include <sys/socket.h> 
 #include <sys/wait.h>
+#include <sys/time.h>
 
 #include "status.hpp"
 #include "shared_conf.hpp"
@@ -112,10 +113,6 @@ Status to_physical_layer(frame *s, int *pipefd, bool is_data = true);
 // timers
 using T_time_seq_nr = typename std::pair<unsigned int, seq_nr>;
 
-// how many ticks a frame lasts
-const unsigned int tick_interval = 1; // TODO: how long is the actual ticking interval of data/ack packets?
-const unsigned int INTERVAL = 500;
-
 // activate clock ticking by pasting the code below
 //
 // #include <sys/time.h>        /* for setitimer */
@@ -125,8 +122,8 @@ const unsigned int INTERVAL = 500;
 //     perror("Unable to catch SIGALRM");
 //     exit(1);
 //   }
-//   it_val.it_value.tv_sec =     INTERVAL/1000;
-//   it_val.it_value.tv_usec =    (INTERVAL*1000) % 1000000;    
+//   it_val.it_value.tv_sec =     1;
+//   it_val.it_value.tv_usec =    0;    
 //   it_val.it_interval = it_val.it_value;
 //   if (setitimer(ITIMER_REAL, &it_val, NULL) == -1) {
 //     perror("error calling setitimer()");

@@ -35,7 +35,7 @@ enum Pipe_RW{
     p_write = 1
 };
 
-enum {
+typedef enum {
     frame_arrival,
     cksum_err,
     timeout,
@@ -43,7 +43,7 @@ enum {
     ack_timeout
 }event_type;
 
-enum {
+typedef enum {
     data,
     ack,
     nak
@@ -73,10 +73,14 @@ extern int sig_timeout;
 extern int sig_ack_timeout;
 //extern timeout_type timeout_or_ackout;
 
-//#define SEND_FILE "rand_100.myfile"
+#define SEND_FILE "rand_100.myfile"
 //#define SEND_FILE "rand_1.myfile"
-#define SEND_FILE "README.md"
+//#define SEND_FILE "README.md"
 #define RECV_FILE "recv.myfile"
 
+// timeout for select.
 const int timeout_seconds = 0;
-const int timeout_microseconds = 50;
+const int timeout_microseconds = 50 * 1000; // 50ms
+
+// how many ticks a frame lasts
+const unsigned int tick_s = 10; // s

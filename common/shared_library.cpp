@@ -8,6 +8,14 @@ int sig_timeout                =   false;
 int sig_ack_timeout            =   false;
 //timeout_type timeout_or_ackout =   simple_timeout;
 
+list<T_time_seq_nr> timer_list;
+// template <class T, class t>
+// typename T::iterator find_by_second_in_list(const T &l, const t second) {
+//     // a helper function that finds in list l with element type of pair by the value of 
+//     // the second component of its pair elements
+//     return find_if(l.begin(), l.end(), [&first](const auto &p) { return p.first == first; });
+// }
+
 /*****************************/
 /*****  Network Layer   ******/
 /*****************************/
@@ -889,8 +897,8 @@ Status SDL_noisy_SAW(int *pipefd) {
     signal(SIGALRM, ticking_handler);
 
     itimerval it_val;
-    it_val.it_value.tv_sec = INTERVAL/1000;
-    it_val.it_value.tv_usec = (INTERVAL*1000) % 1000000;
+    it_val.it_value.tv_sec = 1;
+    it_val.it_value.tv_usec = 0;
     it_val.it_interval = it_val.it_value;
     if (setitimer(ITIMER_REAL, &it_val, NULL) == -1) {
         LOG(Error) << "[SDL]error calling setitimer()" << endl;
@@ -981,43 +989,40 @@ Status SDL_noisy_SAW(int *pipefd) {
                 return rtn;
 
             start_timer(s.seq);
-
+            
             // Block until event comes.
-            while(true){
-                wait_for_event(event);
-                if(event == frame_arrival) {
-                    from_physical_layer(&t, pipe_physical_datalink, false);
-                    LOG(Debug) << "[SDL] get ACK" << endl;
-                    // ACK is good.
-                    if (t.ack == next_frame_to_send) {
-                        LOG(Debug) << "[SDL] ack is good!" << endl;
-                        stop_timer(t.ack);
-                        rtn = from_network_layer(&buffer, pipefd);
-                        if(rtn == E_PIPE_READ)  
-                            return rtn;
-                        inc_1(next_frame_to_send);
-                    } else {
-                        LOG(Info) << "[SDL] ack is not good, resend this frame." << endl;
+            wait_for_event(event);
+            if(event == frame_arrival) {
+                from_physical_layer(&t, pipe_physical_datalink, false);
+                LOG(Debug) << "[SDL] get ACK" << endl;
+                // ACK is good.
+                if (t.ack == next_frame_to_send) {
+                    LOG(Debug) << "[SDL] ack is good!" << endl;
+                    stop_timer(t.ack);
+
+                    if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                        LOG(Info) << "[SDL] Transmission end detected" << endl;
+                        break;
                     }
-                    break;
+
+                    rtn = from_network_layer(&buffer, pipefd);
+                    if(rtn == E_PIPE_READ) {
+                        LOG(Error) << "[SDL] pipe read error." << endl;
+                        return rtn;
+                    }
+                    inc_1(next_frame_to_send);
                 }
-                else if(event == cksum_err) {
-                    LOG(Info) << "[SDL] checksum error, resend this frame." << endl;
-                    break;
-                }
-                else if(event == timeout) {
-                    LOG(Info) << "[SDL] frame timeout and loss, resend this frame." << endl;
-                    break;                    
-                }
-                // other event
                 else {
-                    sleep(1);
+                    LOG(Info) << "[SDL] ack is not good, resend this frame." << endl;
                 }
             }
-            
-            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
-                LOG(Info) << "[SDL] Transmission end detected" << endl;
-                break;
+
+            if(event == cksum_err) {
+                LOG(Info) << "[SDL] checksum error, resend this frame." << endl;
+            }
+
+            if(event == timeout) {
+                LOG(Info) << "[SDL] frame timeout and loss, resend this frame." << endl;                    
             }
         }
 
@@ -1089,10 +1094,7 @@ Status RDL_noisy_SAW(int *pipefd) {
     //physical layer proc 
     else if(phy_pid == 0){
         rtn = receiver_physical_layer(pipe_datalink_physical, pipe_physical_datalink);
-        // if(rtn == TRANSMISSION_END){
-        //     LOG(Info) << "receiver: Transmission end in SDL." << endl;
-        //     return rtn;
-        // }
+
         if(rtn < 0){
             LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
             return rtn;
@@ -1110,59 +1112,59 @@ Status RDL_noisy_SAW(int *pipefd) {
         close(pipefd[p_read]);
         
         seq_nr frame_expected = 0;
-        frame r, s;
+        frame r, s;     // r is from RPL, s is to RPL.
         event_type event;
         Status P_rtn, N_rtn;
-        
 
         s.kind = ack;
         s.seq = 0xFFFFFFFF;
 
         while(true){
             // Block until event comes.
-            while(true){
-                wait_for_event(event);
-                if(event == frame_arrival) {
-                    break;
+            wait_for_event(event);
+            if (event == frame_arrival) {
+                P_rtn = from_physical_layer(&r, pipe_physical_datalink);
+                if(P_rtn < 0)
+                    return P_rtn;
+                
+                if (r.seq == frame_expected) {
+                    N_rtn = to_network_layer(&r.info, pipefd);
+                    if(N_rtn < 0)
+                        return N_rtn;
+
+                    inc_1(frame_expected);
                 }
-                else {
-                    sleep(1);
+
+                s.ack = 1-frame_expected;
+
+                /*
+                rand_for_ack_delay = rand() % 100;
+                if(rand_for_ack_delay < 10) {
+                    usleep(1);
                 }
+                */
+
+                P_rtn = to_physical_layer(&s, pipe_datalink_physical, false);
+                if(P_rtn < 0)
+                    return P_rtn;
+                
+                LOG(Debug) << "[RDL] Send ACK" << endl;
             }
 
-            P_rtn = from_physical_layer(&r, pipe_physical_datalink);
-            if(P_rtn < 0)
-                return P_rtn;
-
-            N_rtn = to_network_layer(&r.info, pipefd);
-            if(N_rtn < 0)
-                return N_rtn;
-            //this must be done afster to_network_layer!!
-            //if(P_rtn == TRANSMISSION_END)
-                //return TRANSMISSION_END;
-
-            //LOG(Debug) << "seq\t" << s.seq << "\tkind\t" << s.kind << endl;
-
-            rand_for_ack_delay = rand() % 100;
-            if(rand_for_ack_delay < 10) {
-                usleep(1);
+            if (event == cksum_err) {
+                LOG(Info) << "[RDL] checksum error, reaccept this frame." << endl;
+                continue;
             }
-
-            P_rtn = to_physical_layer(&s, pipe_datalink_physical, false);
-            if(P_rtn < 0)
-                return P_rtn;
-
-            LOG(Debug) << "[RDL] Send ACK" << endl;
 
             if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
+                LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death." << endl;
                 break;
             }
         }
     }
-    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death." << endl;
+
     close(pipefd[p_write]);
 
-    //LOG(Info) << "[RDL] RDL test passed!" << endl;
     while(1){
         sleep(1);
     }
@@ -1183,8 +1185,8 @@ Status from_network_layer(packet *p, int *pipefd){
 }        
 
 Status to_physical_layer(frame *s, int *pipefd, bool is_data) {
-    //LOG(Debug) << "to_physical_layer: seq\t" << s->seq << "\tkind\t" << s->kind << endl;
     unsigned int write_len = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
+    //cout << write_len << endl;
     char pipe_buf[LEN_PKG_DATA+1];
     
     memcpy(pipe_buf, s, write_len);
@@ -1223,6 +1225,7 @@ Status to_network_layer(packet *p, int *pipefd) {
 
 Status from_physical_layer(frame *s, int *pipefd, bool is_data) {
     unsigned int read_len = is_data ? LEN_PKG_DATA : LEN_PKG_NODATA;
+    //cout << read_len << endl;
     char pipe_buf[LEN_PKG_DATA+1] = {0};
     close(pipefd[p_write]); 
     int r_rtn;
@@ -1750,14 +1753,6 @@ int ready_to_recv(int socketfd) {
     }
 }
 
-list<T_time_seq_nr> timer_list;
-// template <class T, class t>
-// typename T::iterator find_by_second_in_list(const T &l, const t second) {
-//     // a helper function that finds in list l with element type of pair by the value of 
-//     // the second component of its pair elements
-//     return find_if(l.begin(), l.end(), [&first](const auto &p) { return p.first == first; });
-// }
-
 void ticking_handler(int sig) {
     auto &next_timer = *timer_list.begin();
     if (!timer_list.empty() && (--next_timer.first == 0)) {
@@ -1772,7 +1767,7 @@ void ticking_handler(int sig) {
 }
 
 void _start_timer(seq_nr k) {
-    timer_list.emplace_back(tick_interval, k);
+    timer_list.emplace_back(tick_s, k);
 }
 
 void _stop_timer(seq_nr k) {
@@ -1780,7 +1775,6 @@ void _stop_timer(seq_nr k) {
 }
 
 void start_timer(seq_nr k) {
-    timeout_or_ackout = simple_timeout;
     _start_timer(k);	
 }
 
@@ -1789,7 +1783,6 @@ void stop_timer(seq_nr k) {
 }
 
 void start_ack_timer(void) {
-    timeout_or_ackout = ack_timeout;
     _start_timer(0xffffffff);
 }
 
