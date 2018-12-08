@@ -70,6 +70,8 @@ Status receiver_network_layer(int *pipefd);
 /*****************************/
 void handler_SIGFRARV(int sig);
 
+void handler_SIGCKERR(int sig);
+
 void wait_for_event(event_type &event);
 
 Status from_network_layer(packet *p, int *pipefd);

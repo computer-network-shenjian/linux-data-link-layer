@@ -1,13 +1,16 @@
 // Configurations for shared libraries.
 
-//#define 	SIGCKERR	SIGRTMIN+1  //cksum_err
+#define 	SIGCKERR	SIGRTMIN+1  //cksum_err
 #define 	SIGFRARV	SIGRTMIN+2	//frame_arrival
 #define 	SIGNLREADY	SIGRTMIN+3	//network_layer_ready
 #define 	SIGENANL	SIGRTMIN+4	//enable_network_layer
 #define 	SIGDISNL	SIGRTMIN+5	//disble_network_layer
 
-#define  MAX_SEQ     7
-#define inc(k) if(k<MAX_SEQ) k++; else k=0;
+#define  MAX_SEQ_1     1
+#define inc_1(k) if(k<MAX_SEQ_1) k++; else k=0;
+
+#define  MAX_SEQ_7     7
+#define inc_7(k) if(k<MAX_SEQ_7) k++; else k=0;
 
 typedef unsigned int seq_nr;    //send seq
 
@@ -70,7 +73,9 @@ extern int sig_enable_network_layer;
 extern int sig_timeout;
 extern int sig_ack_timeout;
 
-#define SEND_FILE "rand_100.myfile"
+//#define SEND_FILE "rand_100.myfile"
+//#define SEND_FILE "rand_1.myfile"
+#define SEND_FILE "README.md"
 #define RECV_FILE "recv.myfile"
 
 const int timeout_seconds = 0;

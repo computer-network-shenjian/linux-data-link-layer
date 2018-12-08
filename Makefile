@@ -1,7 +1,7 @@
 CXXFLAGS := -std=c++11 -Wall -Wextra
 
-SRC_SENDER := 01/sender1.cpp 02/sender2.cpp #03/sender3.cpp #04/sender4.cpp #05/sender5.cpp #06/sender6.cpp
-SRC_RECEIVER := 01/receiver1.cpp 02/receiver2.cpp #03/receiver3.cpp #04/receiver4.cpp #05/receiver5.cpp #06/receiver6.cpp
+SRC_SENDER := 03/sender3.cpp #04/sender4.cpp #05/sender5.cpp #06/sender6.cpp 01/sender1.cpp 02/sender2.cpp
+SRC_RECEIVER := 03/receiver3.cpp #04/receiver4.cpp #05/receiver5.cpp #06/receiver6.cpp 01/receiver1.cpp 02/receiver2.cpp
 SRC_SENDER_TEST := test/sender_physical_test.cpp
 SRC_RECEIVER_TEST := test/receiver_physical_test.cpp
 
@@ -33,6 +33,6 @@ test: $(TARGET_SENDER_TEST) $(TARGET_RECEIVER_TEST)
 clean :
 	$(RM) $(TARGET_SENDER) $(TARGET_RECEIVER) $(TARGET_SENDER_TEST) $(TARGET_RECEIVER_TEST)
 	$(RM) common/*.o
-	$(RM) 01/*.log 02/*.log 03/*.log 04/*.log 05/*.log 06/*.log test/*.log ./*.log
+	$(RM) 01/*.log 02/*.log 03/*.log 04/*.log 05/*.log 06/*.log test/*.log ./*.log recv.myfile
 
 .PHONY : all test clean

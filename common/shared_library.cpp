@@ -178,6 +178,11 @@ void handler_SIGFRARV(int sig) {
         sig_frame_arrival ++;
 }
 
+void handler_SIGCKERR(int sig) {
+    if(sig == SIGCKERR)
+        sig_cksum_err ++;
+}
+
 void wait_for_event(event_type &event) {
     while(true){
         if(sig_frame_arrival){
@@ -872,10 +877,257 @@ Status RDL_StopAndWait(int *pipefd) {
 }
 
 Status SDL_noisy_SAW(int *pipefd) {
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    LOG(Info) << "[SDL] SDL start" << endl;
+
+    signal(SIGFRARV, handler_SIGFRARV);
+
+    /*********** Pipe init begin ***********/
+
+    int pipe_datalink_physical[2];
+    int pipe_physical_datalink[2];
+
+    if(pipe(pipe_datalink_physical) == -1){
+        LOG(Error) << "[SDL] pipe_datalink_physical init error." << endl;
+        return E_PIPE_INIT;
+    }
+    if(pipe(pipe_physical_datalink) == -1){
+        LOG(Error) << "[SDL] pipe_physical_datalink init error." << endl;
+        return E_PIPE_INIT;
+    }
+
+    //set pipe nonblock
+    int nPipeReadFlag = fcntl(pipe_datalink_physical[p_write], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_datalink_physical[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_datalink_physical set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+    
+    nPipeReadFlag = fcntl(pipe_physical_datalink[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_physical_datalink[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_physical_datalink set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+
+    LOG(Info) << "[SDL] pipe init ok" << endl;
+
+    /*********** Pipe init end ***********/
+    
+    Status rtn = ALL_GOOD;
+    pid_t phy_pid = fork();
+    if(phy_pid < 0){
+        LOG(Error) << "[SDL] fork unsuccessful" << endl;
+        return E_FORK;
+    }
+
+    //physical layer proc
+    else if(phy_pid == 0){
+        prctl(PR_SET_PDEATHSIG, SIGHUP);
+        rtn = sender_physical_layer(pipe_datalink_physical, pipe_physical_datalink);
+        if(rtn == TRANSMISSION_END){
+            LOG(Info) << "sender: Transmission end in SDL." << endl;
+            return rtn;
+        }
+        else if(rtn < 0){
+            LOG(Error) << "[SPL] Error occured in SPL with code: " << rtn << endl;
+            return rtn;
+        }
+        else{    //return ALL_GOOD
+            LOG(Info) << "[SPL] SPL end with success" << endl;
+            return ALL_GOOD;
+        }   
+    }//end of else if
+
+    //datalink layer proc
+    else{    
+        //close write port
+        seq_nr next_frame_to_send = 0;
+        close(pipefd[p_write]);
+        frame s, t; // s is from SNL, t is from SPL.
+        packet buffer;
+        event_type event;
+
+        //enable_network_layer();
+        while(true){
+            rtn = from_network_layer(&buffer, pipefd);
+            if(rtn == E_PIPE_READ)  
+                return rtn;
+
+            s.info = buffer;
+            s.seq = next_frame_to_send;
+
+            rtn = to_physical_layer(&s, pipe_datalink_physical);
+            /*
+            //detect TRANSMISSION_END
+            if(rtn == TRANSMISSION_END)
+                break;
+            */
+
+            if(rtn < 0)
+                return rtn;
+            
+            // TODO: check if upper code do or downer code do.
+            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
+
+            // Block until event comes.
+            
+            start_timer(s.seq);
+
+            while(true){
+                wait_for_event(event);
+                if(event == frame_arrival) {
+                    from_physical_layer(&t, pipe_physical_datalink, false);
+                    LOG(Debug) << "[SDL] get ACK" << endl;
+                    break;
+                }
+                else {
+                    sleep(1);
+                }
+            }
+            
+        }
+
+        LOG(Info) << "[SDL] Transmission end detected" << endl;
+        close(pipefd[p_read]);
+        //wait for child to exit
+        pid_t wait_pid = waitpid(phy_pid, NULL, 0); //wait for phy_pid exit
+        LOG(Debug) << "[SDL] val_waitpid\t" << wait_pid << endl;
+        LOG(Info) << "[SDL] SPL end detected" << endl;
+    }//end of else
+
+    LOG(Info) << "[SDL] SDL end with success!" << endl;
     return ALL_GOOD;
 }
 
 Status RDL_noisy_SAW(int *pipefd) {
+    //exit when father proc exit
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    //avoid zonbie proc
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGFRARV, handler_SIGFRARV);
+    LOG(Info) << "[RDL] RDL start" << endl;
+
+    /*********** Pipe init begin ***********/
+
+    int pipe_physical_datalink[2];
+    int pipe_datalink_physical[2];
+
+    if(pipe(pipe_datalink_physical) == -1){
+        LOG(Error) << "[RDL] pipe_datalink_physical init error." << endl;
+        return E_PIPE_INIT;
+    }
+    if(pipe(pipe_physical_datalink) == -1){
+        LOG(Error) << "[RDL] pipe_physical_datalink init error." << endl;
+        return E_PIPE_INIT;
+    }
+    
+    //set pipe nonblock
+    int nPipeReadFlag = fcntl(pipe_datalink_physical[p_write], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_datalink_physical[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[RDL] pipe_datalink_physical set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+    
+    nPipeReadFlag = fcntl(pipe_physical_datalink[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_physical_datalink[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[RDL] pipe_physical_datalink set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+
+    LOG(Info) << "[RDL] pipe init ok." << endl;
+
+    /*********** Pipe init end ***********/
+
+    Status rtn = ALL_GOOD;
+    pid_t phy_pid = fork();
+    if(phy_pid < 0){
+        LOG(Error) << "[RDL] fork unsuccessful." << endl;
+        return E_FORK;
+    }
+
+    //physical layer proc 
+    else if(phy_pid == 0){
+        rtn = receiver_physical_layer(pipe_datalink_physical, pipe_physical_datalink);
+        // if(rtn == TRANSMISSION_END){
+        //     LOG(Info) << "receiver: Transmission end in SDL." << endl;
+        //     return rtn;
+        // }
+        if(rtn < 0){
+            LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
+            return rtn;
+        }
+        else {
+            LOG(Info) << "[RPL] end with success." << endl;
+            return ALL_GOOD;
+        } 
+    }
+
+    //datalink layer proc
+    else{
+        int rand_for_ack_delay;
+        srand( (unsigned)time( NULL ) ); 
+        close(pipefd[p_read]);
+        frame r, s;
+        event_type event;
+        Status P_rtn, N_rtn;
+
+        s.kind = ack;
+        s.seq = 0xFFFFFFFF;
+
+        while(true){
+            // Block until event comes.
+            while(true){
+                wait_for_event(event);
+                if(event == frame_arrival) {
+                    break;
+                }
+                else {
+                    sleep(1);
+                }
+            }
+
+            P_rtn = from_physical_layer(&r, pipe_physical_datalink);
+            if(P_rtn < 0)
+                return P_rtn;
+
+            N_rtn = to_network_layer(&r.info, pipefd);
+            if(N_rtn < 0)
+                return N_rtn;
+            //this must be done afster to_network_layer!!
+            //if(P_rtn == TRANSMISSION_END)
+                //return TRANSMISSION_END;
+
+            //LOG(Debug) << "seq\t" << s.seq << "\tkind\t" << s.kind << endl;
+
+            rand_for_ack_delay = rand() % 100;
+            if(rand_for_ack_delay < 10) {
+                usleep(1);
+            }
+
+            P_rtn = to_physical_layer(&s, pipe_datalink_physical, false);
+            if(P_rtn < 0)
+                return P_rtn;
+
+            LOG(Debug) << "[RDL] Send ACK" << endl;
+
+            if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
+        }
+    }
+    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death." << endl;
+    close(pipefd[p_write]);
+
+    //LOG(Info) << "[RDL] RDL test passed!" << endl;
+    while(1){
+        sleep(1);
+    }
     return ALL_GOOD;
 }
 
