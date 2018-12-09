@@ -36,6 +36,7 @@ enum Pipe_RW{
 };
 
 typedef enum {
+    no_event
     frame_arrival,
     cksum_err,
     timeout,

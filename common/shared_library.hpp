@@ -60,6 +60,13 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     // 2. Input ofstream log_stream has been opened before getting into this function: E_LOG_ISOPEN.
     // 3. Open log error: E_LOG_OPEN.
 
+Status nonblock_pipe_init(int *pipefd);
+// fuction: init pipe (both port）in a nonblock way
+// precondition: giving a pipe: (int *)pipefd
+// postcondition:
+//         1.ALL_GOOD init succeed
+//         2.E_PIPE_INIT   failee
+
 unsigned int count_ending_zeros(const char * const data, unsigned int data_length = 1024);
 // Intro: count the number of ending zeros of an array from position data_length.
 

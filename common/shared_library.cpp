@@ -133,6 +133,13 @@ Status sender_datalink_layer(DProtocol protocol, int *pipefd) {
             LOG(Debug) << "[SDL] Return value of SDL_noisy_SAW\t" << val << endl;
             return val;
         }
+
+        case(one_bit_sliding): {
+            LOG(Info) << "[SDL] Getting into SDL with protocol: one_bit_sliding" << endl;
+            val = SDL_SlidingWindow(pipefd);
+            LOG(Debug) << "[SDL] Return value of SDL_noisy_SAW\t" << val << endl;
+            return val;
+        }
         default: {
             LOG(Error) << "[SDL] Datalink protocol selection error" << endl;
             return E_DATALINK_SELECT;
@@ -843,7 +850,7 @@ Status RDL_noisy_SAW(int *pipefd) {
         return E_PIPE_INIT;
     }
 
-    LOG(Info) << "[SDL] pipe init ok" << endl;
+    LOG(Info) << "[RDL] pipe init ok" << endl;
 
     /*********** Pipe init end ***********/
 
@@ -922,6 +929,288 @@ Status RDL_noisy_SAW(int *pipefd) {
 
     close(pipefd[p_write]);
 
+    while(1){
+        sleep(1);
+    }
+    return ALL_GOOD;
+}
+
+Status SDL_SlidingWindow(int *pipefd) {
+    LOG(Info) << "[SDL] SDL start" << endl;
+
+    /*********** signal init begin ***********/
+
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+    signal(SIGFRARV, handler_SIGFRARV);
+    signal(SIGCKERR, handler_SIGCKERR);
+    signal(SIGALRM, ticking_handler);
+
+    itimerval it_val;
+    it_val.it_value.tv_sec = 1;
+    it_val.it_value.tv_usec = 0;
+    it_val.it_interval = it_val.it_value;
+    if (setitimer(ITIMER_REAL, &it_val, NULL) == -1) {
+        LOG(Error) << "[SDL]error calling setitimer()" << endl;
+        return E_SETTIMER;
+    }
+
+    /*********** signal init end ***********/
+
+    /*********** Pipe init begin ***********/
+
+    int pipe_datalink_physical[2];
+    int pipe_physical_datalink[2];
+
+    if(nonblock_pipe_init(pipe_datalink_physical) != ALL_GOOD)
+        return E_PIPE_INIT;
+    if(nonblock_pipe_init(pipe_physical_datalink) != ALL_GOOD)
+        return E_PIPE_INIT;
+
+    LOG(Info) << "[SDL] pipe init ok" << endl;
+
+    /*********** Pipe init end ***********/
+    
+    Status rtn = ALL_GOOD;
+    pid_t phy_pid = fork();
+    if(phy_pid < 0){
+        LOG(Error) << "[SDL] fork unsuccessful" << endl;
+        return E_FORK;
+    }
+
+    //physical layer proc
+    else if(phy_pid == 0){
+        prctl(PR_SET_PDEATHSIG, SIGHUP);
+        rtn = SPL(pipe_datalink_physical, pipe_physical_datalink, error_rate);
+        if(rtn == TRANSMISSION_END){
+            LOG(Info) << "[SDL] Transmission end in SDL." << endl;
+            return rtn;
+        }
+        else if(rtn < 0){
+            LOG(Error) << "[SPL] Error occured in SPL with code: " << rtn << endl;
+            return rtn;
+        }
+        else{    //return ALL_GOOD
+            LOG(Info) << "[SPL] SPL end with success" << endl;
+            return ALL_GOOD;
+        }   
+    }//end of else if
+
+    //datalink layer proc
+    else{    
+        //close write port
+        close(pipefd[p_write]);
+
+        seq_nr next_frame_to_send = 0;
+        seq_nr frame_expected = 0;
+        frame s, trash;
+        packet buffer;
+        event_type event = no_event;
+
+        rtn = from_network_layer(&buffer, pipefd);
+        if(rtn == E_PIPE_READ)  
+            return rtn;
+
+        s.kind = hton(data);
+        s.seq = hton(next_frame_to_send);
+        s.ack = hton(1-frame_expected);
+        s.info = buffer;
+
+        to_physical_layer(&s, pipe_datalink_physical);
+        start_timer(s.seq);
+
+        while(true){
+            wait_for_event(event);
+            //frame_arrival
+            if(event == frame_arrival) {
+                //after frame_arrived
+                from_physical_layer(&trash, pipe_physical_datalink, false);
+                LOG(Debug) << "[SDL] get ACK and trashed" << endl;
+                
+                if(trash.seq == frame_expected){
+                    //to_network_layer(&transh.info);
+                    inc_1(frame_expected);
+                }
+                if(trash.ack == next_frame_to_semd){
+                    stop_timer(trash.ack);
+                    from_network_layer(&buffer, pipefd);
+                    inc_1(next_frame_to_send);
+                }
+            }//end of event frame_arrival
+            //encountered other event(timeout)
+            
+
+            //this buffer could be the old one or new one
+            s.info = buffer;
+            s.kind = hton(data);
+            s.seq = hton(next_frame_to_send);
+            s.ack = hton(1-frame_expected);
+
+            rtn = to_physical_layer(&s, pipe_datalink_physical);
+            if(rtn < 0)
+                return rtn;
+            // TODO: check if upper code do or downer code do.
+            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
+            start_timer(s.seq);     
+        }
+
+        LOG(Info) << "[SDL] Transmission end detected" << endl;
+        close(pipefd[p_read]);
+        //wait for child to exit
+        pid_t wait_pid = waitpid(phy_pid, NULL, 0); //wait for phy_pid exit
+        LOG(Debug) << "[SDL] val_waitpid\t" << wait_pid << endl;
+        LOG(Info) << "[SDL] SPL end detected" << endl;
+    }//end of else
+
+    LOG(Info) << "[SDL] SDL end with success!" << endl;
+    return ALL_GOOD;
+}
+
+Status RDL_SlidingWindow(int *pipefd) {
+    LOG(Info) << "[RDL] RDL start" << endl;
+
+    /*********** signal init begin ***********/
+
+    //exit when father proc exit
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    //avoid zombie proc
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGFRARV, handler_SIGFRARV);
+    signal(SIGCKERR, handler_SIGCKERR);
+    
+    /*********** signal init end ***********/
+
+    /*********** Pipe init begin ***********/
+
+    int pipe_datalink_physical[2];
+    int pipe_physical_datalink[2];
+
+    if(nonblock_pipe_init(pipe_datalink_physical) != ALL_GOOD)
+        return E_PIPE_INIT;
+    if(nonblock_pipe_init(pipe_physical_datalink) != ALL_GOOD)
+        return E_PIPE_INIT;
+
+    LOG(Info) << "[RDL] pipe init ok" << endl;
+
+    /*********** Pipe init end ***********/
+    
+    Status rtn = ALL_GOOD;
+    pid_t phy_pid = fork();
+    if(phy_pid < 0){
+        LOG(Error) << "[RDL] fork unsuccessful" << endl;
+        return E_FORK;
+    }
+
+    //physical layer proc
+    else if(phy_pid == 0){
+        rtn = RPL(pipe_datalink_physical, pipe_physical_datalink);
+        else if(rtn < 0){
+            LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
+            return rtn;
+        }
+        else{    //return ALL_GOOD
+            LOG(Info) << "[RPL] RPL end with success" << endl;
+            return ALL_GOOD;
+        }   
+    }//end of else if
+
+    //datalink layer proc
+    else{    
+        //close write port
+        close(pipefd[p_read]);
+
+        seq_nr next_frame_to_send = 0;
+        seq_nr frame_expected = 0;
+        frame s, r;
+        packet buffer;
+        event_type event = no_event;
+        int N_rtn, P_rtn;
+  //       rtn = from_net  work_layer(&buffer, pipefd);
+  //       if(rtn == E_PIPE_READ)  
+  //           return rtn;
+
+  //       s.kind = hton(data);
+  //       s.seq = hton(next_frame_to_send);
+  //       s.ack = hton(frame_expected);
+        // s.info = buffer;
+
+  //       to_physical_layer(&s, pipe_datalink_physical);
+  //       start_timer(s.seq);
+        s.kind = hton(ack);
+        s.seq = hton(0xFFFFFFFF);
+        s.ack = hton(1-frame_expected);
+
+        wait_for_event(event);
+        if(event == frame_arrival) {
+            //after frame_arrived
+            P_rtn = from_physical_layer(&r, pipe_physical_datalink, true); //recv data
+            if(P_rtn < 0)
+                return P_rtn;
+            LOG(Debug) << "[RDL] get frame from tcp." << endl;
+            
+            if(r.seq == frame_expected){
+                N_rtn = to_network_layer(&r.info, pipefd);
+                if(N_rtn < 0)
+                    return N_rtn;
+                inc_1(frame_expected);
+            }
+        }//end of event frame_arrival
+
+        rtn = to_physical_layer(&s, pipe_datalink_physical, false);
+        if(rtn < 0)
+            return rtn;
+        // TODO: check if upper code do or downer code do.
+        if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+            break;
+        }
+        start_ack_timer();   
+
+        while(true){
+            LOG(Info) << "[RDL] beginning waiting for event\n";        
+            wait_for_event(event);
+            //frame_arrival
+            if(event == frame_arrival) {
+                //after frame_arrived
+                P_rtn = from_physical_layer(&r, pipe_physical_datalink, true); //recv data
+                if(P_rtn < 0)
+                    return P_rtn;
+                LOG(Debug) << "[RDL] get frame from tcp." << endl;
+                
+                if(r.seq == frame_expected){
+                    N_rtn = to_network_layer(&r.info, pipefd);
+                    if(N_rtn < 0)
+                        return N_rtn;
+                    inc_1(frame_expected);
+                }
+                if(r.ack == next_frame_to_semd){
+                    stop_ack_timer();
+                    from_network_layer(&buffer, pipefd);
+                    inc_1(next_frame_to_send);
+                }
+            }//end of event frame_arrival
+            //encountered frame_arrival or
+            //other event(timeout)  
+
+            //this buffer could be the old one or new one
+            s.info = buffer;
+            s.ack = hton(1-frame_expected);
+
+            rtn = to_physical_layer(&s, pipe_datalink_physical, false);
+            if(rtn < 0)
+                return rtn;
+            // TODO: check if upper code do or downer code do.
+            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
+            start_ack_timer();     
+        }
+
+    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death." << endl;
+    close(pipefd[p_write]);
+
+    //LOG(Info) << "[RDL] RDL test passed!" << endl;
     while(1){
         sleep(1);
     }
@@ -1452,6 +1741,28 @@ Status log_init(std::ofstream &log_stream, const std::string log_name, const Lev
     }
     Log::get().setLogStream(log_stream);
     Log::get().setLevel(level);
+    return ALL_GOOD;
+}
+
+Status nonblock_pipe_init(int *pipefd)
+{
+    if(pipe(pipefd) == -1){
+        LOG(Error) << "[SDL] pipe_datalink_physical init error." << endl;
+        return E_PIPE_INIT;
+    }
+    //set pipe nonblock
+    int nPipeReadFlag = fcntl(pipefd[p_write], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipefd[p_write], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_datalink_physical set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+    nPipeReadFlag = fcntl(pipefd[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipefd[p_read], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_datalink_physical set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
     return ALL_GOOD;
 }
 
