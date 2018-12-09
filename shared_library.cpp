@@ -133,6 +133,7 @@ Status sender_datalink_layer(DProtocol protocol, int *pipefd) {
             LOG(Debug) << "[SDL] Return value of SDL_noisy_SAW\t" << val << endl;
             return val;
         }
+
         case(one_bit_sliding): {
             LOG(Info) << "[SDL] Getting into SDL with protocol: one_bit_sliding" << endl;
             val = SDL_SlidingWindow(pipefd);
@@ -173,12 +174,6 @@ Status receiver_datalink_layer(DProtocol protocol, int*pipefd) {
             LOG(Info) << "[RDL] Getting into RDL with protocol: noisy_stop_and_wait" << endl;
             val = RDL_noisy_SAW(pipefd);
             LOG(Debug) << "[RDL] Return value of RDL_noisy_SAW\t" << val << endl;
-            return val;
-        }
-        case(one_bit_sliding): {
-            LOG(Info) << "[SDL] Getting into SDL with protocol: one_bit_sliding" << endl;
-            val = RDL_SlidingWindow(pipefd);
-            LOG(Debug) << "[SDL] Return value of SDL_noisy_SAW\t" << val << endl;
             return val;
         }
         default: {
@@ -1016,9 +1011,9 @@ Status SDL_SlidingWindow(int *pipefd) {
         if(rtn == E_PIPE_READ)  
             return rtn;
 
-        s.kind = data;
-        s.seq = next_frame_to_send;
-        s.ack = 1-frame_expected;
+        s.kind = hton(data);
+        s.seq = hton(next_frame_to_send);
+        s.ack = hton(1-frame_expected);
         s.info = buffer;
 
         to_physical_layer(&s, pipe_datalink_physical);
@@ -1047,9 +1042,9 @@ Status SDL_SlidingWindow(int *pipefd) {
 
             //this buffer could be the old one or new one
             s.info = buffer;
-            s.kind = data;
-            s.seq = next_frame_to_send;
-            s.ack = 1-frame_expected;
+            s.kind = hton(data);
+            s.seq = hton(next_frame_to_send);
+            s.ack = hton(1-frame_expected);
 
             rtn = to_physical_layer(&s, pipe_datalink_physical);
             if(rtn < 0)
@@ -1143,9 +1138,9 @@ Status RDL_SlidingWindow(int *pipefd) {
 
   //       to_physical_layer(&s, pipe_datalink_physical);
   //       start_timer(s.seq);
-        s.kind = ack;
-        s.seq = 0xFFFFFFFF;
-        s.ack = 1-frame_expected;
+        s.kind = hton(ack);
+        s.seq = hton(0xFFFFFFFF);
+        s.ack = hton(1-frame_expected);
 
         wait_for_event(event);
         if(event == frame_arrival) {
@@ -1190,21 +1185,21 @@ Status RDL_SlidingWindow(int *pipefd) {
                     from_network_layer(&buffer, pipefd);
                     inc_1(next_frame_to_send);
                 }
-                if (0 == memcmp(r.info.data, all_zero, RAW_DATA_SIZE)) {
-                    LOG(Info) << "[RDL] Transmission end detected, wait for RNL's death." << endl;
-                    break;
-                }
             }//end of event frame_arrival
             //encountered frame_arrival or
             //other event(timeout)  
 
             //this buffer could be the old one or new one
             s.info = buffer;
-            s.ack = 1-frame_expected;
+            s.ack = hton(1-frame_expected);
 
             rtn = to_physical_layer(&s, pipe_datalink_physical, false);
             if(rtn < 0)
                 return rtn;
+            // TODO: check if upper code do or downer code do.
+            if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
+                break;
+            }
             start_ack_timer();     
         }
 
