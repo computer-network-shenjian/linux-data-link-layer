@@ -21,6 +21,7 @@
 #include <sys/socket.h> 
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <fcntl.h>
 
 #include "status.hpp"
 #include "shared_conf.hpp"
@@ -179,6 +180,8 @@ Status SDL_noisy_SAW(int *pipefd);
 
 Status RDL_noisy_SAW(int *pipefd);
 
+Status SDL_SlidingWindow(int *pipefd);
+Status RDL_SlidingWindow(int *pipefd);
 /*****************************/
 /*****  Physical Layer   *****/
 /*****************************/

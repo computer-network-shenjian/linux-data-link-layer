@@ -1011,9 +1011,9 @@ Status SDL_SlidingWindow(int *pipefd) {
         if(rtn == E_PIPE_READ)  
             return rtn;
 
-        s.kind = hton(data);
-        s.seq = hton(next_frame_to_send);
-        s.ack = hton(1-frame_expected);
+        s.kind = data;
+        s.seq = next_frame_to_send;
+        s.ack = 1-frame_expected;
         s.info = buffer;
 
         to_physical_layer(&s, pipe_datalink_physical);
@@ -1031,7 +1031,7 @@ Status SDL_SlidingWindow(int *pipefd) {
                     //to_network_layer(&transh.info);
                     inc_1(frame_expected);
                 }
-                if(trash.ack == next_frame_to_semd){
+                if(trash.ack == next_frame_to_send){
                     stop_timer(trash.ack);
                     from_network_layer(&buffer, pipefd);
                     inc_1(next_frame_to_send);
@@ -1042,9 +1042,9 @@ Status SDL_SlidingWindow(int *pipefd) {
 
             //this buffer could be the old one or new one
             s.info = buffer;
-            s.kind = hton(data);
-            s.seq = hton(next_frame_to_send);
-            s.ack = hton(1-frame_expected);
+            s.kind = data;
+            s.seq = next_frame_to_send;
+            s.ack = 1-frame_expected;
 
             rtn = to_physical_layer(&s, pipe_datalink_physical);
             if(rtn < 0)
@@ -1106,7 +1106,7 @@ Status RDL_SlidingWindow(int *pipefd) {
     //physical layer proc
     else if(phy_pid == 0){
         rtn = RPL(pipe_datalink_physical, pipe_physical_datalink);
-        else if(rtn < 0){
+        if(rtn < 0){
             LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
             return rtn;
         }
@@ -1138,9 +1138,9 @@ Status RDL_SlidingWindow(int *pipefd) {
 
   //       to_physical_layer(&s, pipe_datalink_physical);
   //       start_timer(s.seq);
-        s.kind = hton(ack);
-        s.seq = hton(0xFFFFFFFF);
-        s.ack = hton(1-frame_expected);
+        s.kind = ack;
+        s.seq = 0xFFFFFFFF;
+        s.ack = 1-frame_expected;
 
         wait_for_event(event);
         if(event == frame_arrival) {
@@ -1161,10 +1161,6 @@ Status RDL_SlidingWindow(int *pipefd) {
         rtn = to_physical_layer(&s, pipe_datalink_physical, false);
         if(rtn < 0)
             return rtn;
-        // TODO: check if upper code do or downer code do.
-        if (0 == memcmp(s.info.data, all_zero, RAW_DATA_SIZE)) {
-            break;
-        }
         start_ack_timer();   
 
         while(true){
@@ -1184,7 +1180,7 @@ Status RDL_SlidingWindow(int *pipefd) {
                         return N_rtn;
                     inc_1(frame_expected);
                 }
-                if(r.ack == next_frame_to_semd){
+                if(r.ack == next_frame_to_send){
                     stop_ack_timer();
                     from_network_layer(&buffer, pipefd);
                     inc_1(next_frame_to_send);
@@ -1195,7 +1191,7 @@ Status RDL_SlidingWindow(int *pipefd) {
 
             //this buffer could be the old one or new one
             s.info = buffer;
-            s.ack = hton(1-frame_expected);
+            s.ack = 1-frame_expected;
 
             rtn = to_physical_layer(&s, pipe_datalink_physical, false);
             if(rtn < 0)
@@ -1215,6 +1211,7 @@ Status RDL_SlidingWindow(int *pipefd) {
         sleep(1);
     }
     return ALL_GOOD;
+}
 }
 
 Status from_network_layer(packet *p, int *pipefd){
