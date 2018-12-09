@@ -25,28 +25,25 @@ int main() {
     if (datalink_pid < 0) {
         LOG(Error) << "[SNL] fork unsuccessful" << endl;
         return E_FORK;
-    }
-    else if (datalink_pid == 0) {
+    } else if (datalink_pid == 0) {
+        // in child, run data link layer
         //Status val_datalink = sender_datalink_layer(test, pipe_network_datalink);
         Status val_datalink = sender_datalink_layer(utopia, pipe_network_datalink);
         if (val_datalink < 0) {
             LOG(Error) << "[SDL] Error occured in SDL with code: " << val_datalink << endl;
             return val_datalink;
-        }
-        else {
+        } else {
             LOG(Info) << "[SDL] SDL end with success" << endl;
             return ALL_GOOD;
         }
-    }
-    else {
+    } else {
         Status val_snl = sender_network_layer(pipe_network_datalink, datalink_pid);
         LOG(Debug) << "[SNL] val_snl\t" << val_snl << endl;
         if (val_snl < 0) {
             LOG(Error) << "[SNL] Error occured in SNL with code: " << val_snl << endl;
             log_stream.close();
             return val_snl;
-        }
-        else {
+        } else {
             LOG(Info) << "[SNL] SNL end with success" << endl;
             log_stream.close();
             return ALL_GOOD;

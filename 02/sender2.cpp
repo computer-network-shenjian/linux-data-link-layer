@@ -2,7 +2,7 @@
 
 int main() {
     std::ofstream log_stream;
-    if(log_init(log_stream, "sender2.log", Info) < 0) {
+    if(log_init(log_stream, "sender2.log", Debug) < 0) {
         cout << "[SNL] Open log error!" << endl;
         return E_LOG_OPEN;
     }
@@ -25,8 +25,7 @@ int main() {
     if (datalink_pid < 0) {
         LOG(Error) << "[SNL] fork unsuccessful" << endl;
         return E_FORK;
-    }
-    else if (datalink_pid == 0) {
+    } else if (datalink_pid == 0) {
         Status val_datalink = sender_datalink_layer(simple_stop_and_wait, pipe_network_datalink);
         if (val_datalink < 0) {
             LOG(Error) << "[SDL] Error occured in SDL with code: " << val_datalink << endl;

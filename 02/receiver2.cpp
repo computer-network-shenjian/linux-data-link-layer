@@ -1,7 +1,7 @@
 #include "../common/shared_library.hpp"
 
 int main() {
-	std::ofstream log_stream;
+    std::ofstream log_stream;
     if(log_init(log_stream, "receiver2.log", Info) < 0) {
         cout << "[RNL] Open log error!" << endl;
         return E_LOG_OPEN;

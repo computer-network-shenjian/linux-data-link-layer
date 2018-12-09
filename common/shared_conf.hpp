@@ -74,7 +74,7 @@ extern int sig_ack_timeout;
 //extern timeout_type timeout_or_ackout;
 
 //#define SEND_FILE "rand_100.myfile"
-#define SEND_FILE "rand_1.myfile"
+#define SEND_FILE "rand_100.myfile"
 //#define SEND_FILE "README.md"
 #define RECV_FILE "recv.myfile"
 
@@ -84,4 +84,4 @@ const int timeout_microseconds = 50 * 1000; // 50ms
 
 // how many ticks a frame lasts
 const unsigned int tick_s = 2; // s
-const int error_rate = 1; // %
+const int error_rate = 0; // %
