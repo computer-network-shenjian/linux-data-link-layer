@@ -952,8 +952,20 @@ Status SDL_noisy_SAW(int *pipefd) {
         LOG(Error) << "[SDL] pipe_datalink_physical set fcntl error." << endl;
         return E_PIPE_INIT;
     }
+    nPipeReadFlag = fcntl(pipe_datalink_physical[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_datalink_physical[p_read], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_datalink_physical set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
     
     nPipeReadFlag = fcntl(pipe_physical_datalink[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_physical_datalink[p_read], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_physical_datalink set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+    nPipeReadFlag = fcntl(pipe_physical_datalink[p_write], F_GETFL, 0);
     nPipeReadFlag |= O_NONBLOCK;
     if (fcntl(pipe_physical_datalink[p_write], F_SETFL, nPipeReadFlag) < 0) {
         LOG(Error) << "[SDL] pipe_physical_datalink set fcntl error." << endl;
@@ -974,7 +986,7 @@ Status SDL_noisy_SAW(int *pipefd) {
     //physical layer proc
     else if(phy_pid == 0){
         prctl(PR_SET_PDEATHSIG, SIGHUP);
-        rtn = SPL_noisy(pipe_datalink_physical, pipe_physical_datalink, 0);
+        rtn = SPL_new(pipe_datalink_physical, pipe_physical_datalink, error_rate);
         if(rtn == TRANSMISSION_END){
             LOG(Info) << "sender: Transmission end in SDL." << endl;
             return rtn;
@@ -1078,34 +1090,46 @@ Status RDL_noisy_SAW(int *pipefd) {
 
     /*********** Pipe init begin ***********/
 
-    int pipe_physical_datalink[2];
     int pipe_datalink_physical[2];
+    int pipe_physical_datalink[2];
 
     if(pipe(pipe_datalink_physical) == -1){
-        LOG(Error) << "[RDL] pipe_datalink_physical init error." << endl;
+        LOG(Error) << "[SDL] pipe_datalink_physical init error." << endl;
         return E_PIPE_INIT;
     }
     if(pipe(pipe_physical_datalink) == -1){
-        LOG(Error) << "[RDL] pipe_physical_datalink init error." << endl;
+        LOG(Error) << "[SDL] pipe_physical_datalink init error." << endl;
         return E_PIPE_INIT;
     }
-    
+
     //set pipe nonblock
     int nPipeReadFlag = fcntl(pipe_datalink_physical[p_write], F_GETFL, 0);
     nPipeReadFlag |= O_NONBLOCK;
     if (fcntl(pipe_datalink_physical[p_write], F_SETFL, nPipeReadFlag) < 0) {
-        LOG(Error) << "[RDL] pipe_datalink_physical set fcntl error." << endl;
+        LOG(Error) << "[SDL] pipe_datalink_physical set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+    nPipeReadFlag = fcntl(pipe_datalink_physical[p_read], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_datalink_physical[p_read], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_datalink_physical set fcntl error." << endl;
         return E_PIPE_INIT;
     }
     
     nPipeReadFlag = fcntl(pipe_physical_datalink[p_read], F_GETFL, 0);
     nPipeReadFlag |= O_NONBLOCK;
+    if (fcntl(pipe_physical_datalink[p_read], F_SETFL, nPipeReadFlag) < 0) {
+        LOG(Error) << "[SDL] pipe_physical_datalink set fcntl error." << endl;
+        return E_PIPE_INIT;
+    }
+    nPipeReadFlag = fcntl(pipe_physical_datalink[p_write], F_GETFL, 0);
+    nPipeReadFlag |= O_NONBLOCK;
     if (fcntl(pipe_physical_datalink[p_write], F_SETFL, nPipeReadFlag) < 0) {
-        LOG(Error) << "[RDL] pipe_physical_datalink set fcntl error." << endl;
+        LOG(Error) << "[SDL] pipe_physical_datalink set fcntl error." << endl;
         return E_PIPE_INIT;
     }
 
-    LOG(Info) << "[RDL] pipe init ok." << endl;
+    LOG(Info) << "[SDL] pipe init ok" << endl;
 
     /*********** Pipe init end ***********/
 
@@ -1119,7 +1143,7 @@ Status RDL_noisy_SAW(int *pipefd) {
     //physical layer proc 
     else if(phy_pid == 0){
         LOG(Info) << "Entering RPL_new 1\n";
-        rtn = RPL_new(pipe_datalink_physical, pipe_physical_datalink, error_rate);
+        rtn = RPL_new(pipe_datalink_physical, pipe_physical_datalink, 0);
 
         if(rtn < 0){
             LOG(Error) << "[RPL] Error occured in RPL with code: " << rtn << endl;
@@ -2120,7 +2144,7 @@ Status RPL_noisy(int *pipefd_down, int *pipefd_up, const int noise) {
 }
 
 Status SPL_new(int *pipe_down, int *pipe_up, const int noise) {
-    LOG(Info) << "Entering SPL_new 2\n";
+    LOG(Info) << "Entering SPL_new\n";
     /* Preparation for random */
     srand( (unsigned)time( NULL ) );
     int random_num = 0;
@@ -2157,12 +2181,12 @@ Status SPL_new(int *pipe_down, int *pipe_up, const int noise) {
         FD_SET(socket, &wfd);
         
         int rv = select(socket+1, &rfd, &wfd, NULL, NULL);
-        LOG(Info) << "[SPL] select returned with " << rv << endl;
-        LOG(Info) << "FD_ISSET: " << FD_ISSET(socket, &rfd) << " " << FD_ISSET(socket, &wfd) << endl;
+        LOG(Debug) << "[SPL] select returned with " << rv << endl;
+        LOG(Debug) << "FD_ISSET: " << FD_ISSET(socket, &rfd) << " " << FD_ISSET(socket, &wfd) << endl;
 
         // state_recv
         if (state_recv == 0 && FD_ISSET(socket, &rfd)) {
-            LOG(Info) << "tcp recv\n";
+            LOG(Debug) << "tcp recv\n";
             FD_CLR(socket, &rfd);
             // Get frame from TCP
             int val_recv = recv(socket, recv_buf+total_recv, LEN_PKG_NODATA-total_recv, 0);
@@ -2255,7 +2279,7 @@ Status RPL_new(int *pipe_down, int *pipe_up, const int noise) {
     
     /* To be a server and connect to a client */
     int socket = tcp_server_block();
-    LOG(Info) << "[RPL] tcp_ser_block()" << endl;
+    LOG(Debug) << "[RPL] tcp_ser_block()" << endl;
     if (socket < 0) {
         LOG(Error) << "[RPL] TCP server init error with code: " << socket << endl;
         return socket;
@@ -2273,14 +2297,14 @@ Status RPL_new(int *pipe_down, int *pipe_up, const int noise) {
     int total_send = 0, total_recv = 0;
     int total_pipe_write = 0, total_pipe_read = 0;
     while(1) {
-        LOG(Info) << flush;
+        LOG(Debug) << flush;
 
         FD_ZERO(&rfd); FD_ZERO(&wfd);
         FD_SET(socket, &rfd); FD_SET(socket, &wfd);
         
         int rv = select(socket+1, &rfd, &wfd, NULL, NULL);
-        LOG(Info) << "[RPL] select returned with " << rv << endl;
-        LOG(Info) << "FD_ISSET: " << FD_ISSET(socket, &rfd) << " " << FD_ISSET(socket, &wfd) << endl;
+        LOG(Debug) << "[RPL] select returned with " << rv << endl;
+        LOG(Debug) << "FD_ISSET: " << FD_ISSET(socket, &rfd) << " " << FD_ISSET(socket, &wfd) << endl;
 
         // state_recv
         if (state_recv == 0 && FD_ISSET(socket, &rfd)) {
