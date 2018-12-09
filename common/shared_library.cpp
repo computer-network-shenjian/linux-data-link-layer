@@ -1156,7 +1156,7 @@ Status RDL_noisy_SAW(int *pipefd) {
     }
 
     //datalink layer proc
-    else{
+    else {
         close(pipefd[p_read]);
         
         seq_nr frame_expected = 0;
@@ -2147,7 +2147,6 @@ Status SPL_new(int *pipe_down, int *pipe_up, const int noise) {
     LOG(Info) << "Entering SPL_new\n";
     /* Preparation for random */
     srand( (unsigned)time( NULL ) );
-    int random_num = 0;
 
     /* Other preparations */
     prctl(PR_SET_PDEATHSIG, SIGHUP);
@@ -2206,6 +2205,7 @@ Status SPL_new(int *pipe_down, int *pipe_up, const int noise) {
                 LOG(Info) << "[SPL] got a whole ACK frame from receiver" << endl;
 
                 // drop packet with random possibility
+                int random_num = rand() % 100;
                 if (random_num < noise) { // discard frame and send SIGCKERR.
                     kill(getppid(), SIGCKERR);
                     LOG(Info) << "[SPL] drop frame and send SIGCKERR" << endl;
@@ -2333,7 +2333,7 @@ Status RPL_new(int *pipe_down, int *pipe_up, const int noise) {
                 } else if (random_num > 99-noise) { // discard frame and do nothing.
                     LOG(Info) << "[RPL] drop frame and do nothing" << endl;
                 } else {
-                    // don't drop
+                    // don't drop, switch state
                     state_recv = 1;
                     LOG(Info) << "[RPL] no drop" << endl;
                 }
@@ -2384,7 +2384,6 @@ Status RPL_new(int *pipe_down, int *pipe_up, const int noise) {
                     LOG(Info) << "ACK packet send to sender\n";
                 }
             }
-            // No need to check whether all zero is get, parent will die after all-zero's ACK is get.
         }
     }
 }
