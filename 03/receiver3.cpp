@@ -2,7 +2,7 @@
 
 int main() {
 	std::ofstream log_stream;
-    if(log_init(log_stream, "receiver3.log", Error) < 0) {
+    if(log_init(log_stream, "receiver3.log", Info) < 0) {
         cout << "[RNL] Open log error!" << endl;
         return E_LOG_OPEN;
     }

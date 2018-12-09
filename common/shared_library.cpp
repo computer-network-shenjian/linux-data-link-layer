@@ -1155,10 +1155,10 @@ Status SPL(int *pipe_down, int *pipe_up, const int noise) {
                     state_recv = 1;
                     LOG(Info) << "[SPL] no drop" << endl;
                 }
-
             }
         }
         if (state_recv == 1 && pipe_up) {
+            ntohl_tool(recv_buf);
             int rv = write(pipe_up[p_write], recv_buf, LEN_PKG_NODATA);
             if (rv > 0) total_pipe_write += rv; // ignore error
             if (total_pipe_write == LEN_PKG_NODATA) {
@@ -1182,6 +1182,7 @@ Status SPL(int *pipe_down, int *pipe_up, const int noise) {
             }
         }
         if (state_send == 1 && FD_ISSET(socket, &wfd)) {
+            htonl_tool(send_buf);
             // already read from pipe
             FD_CLR(socket, &wfd);
             // Send ACK to TCP
@@ -1265,8 +1266,9 @@ Status RPL(int *pipe_down, int *pipe_up, const int noise) {
                 LOG(Error) << "[RPL] recv error" << endl;
                 graceful_return("recv", E_RECV);
             } else if (val_recv == 0) {
-                LOG(Error) << "[RPL] peer disconnected" << endl;
-                graceful_return("peer disconnected", E_PEEROFF);
+                LOG(Info) << "[RPL] peer disconnected, maybe error, maybe not" << endl;
+                //graceful_return("peer disconnected", E_PEEROFF);
+                return ALL_GOOD;
             } else {
                 total_recv += val_recv;
             }
@@ -1286,11 +1288,12 @@ Status RPL(int *pipe_down, int *pipe_up, const int noise) {
                     // don't drop, switch state
                     state_recv = 1;
                     LOG(Info) << "[RPL] no drop" << endl;
+                    htonl_tool(recv_buf);
                 }
-
             }
         }
         if (state_recv == 1) {
+            ntohl_tool(recv_buf);
             int rv = write(pipe_up[p_write], recv_buf, LEN_PKG_DATA);
             if (rv > 0) total_pipe_write += rv; // ignore error
             if (total_pipe_write == LEN_PKG_DATA) {
@@ -1299,6 +1302,10 @@ Status RPL(int *pipe_down, int *pipe_up, const int noise) {
                 kill(getppid(), SIGFRARV);
                 total_pipe_write = 0;
                 state_recv = 0;
+                // all zero check for utopia protocol.
+                if (!pipe_down && 0 == memcmp(recv_buf+LEN_PKG_NODATA, all_zero, RAW_DATA_SIZE)) {
+                    break;
+                }
             }
         }
 
@@ -1314,6 +1321,7 @@ Status RPL(int *pipe_down, int *pipe_up, const int noise) {
             }
         }
         if (state_send == 1 && FD_ISSET(socket, &wfd) && pipe_down) {
+            htonl_tool(send_buf);
             // already read from pipe
             FD_CLR(socket, &wfd);
             // Send ACK to TCP
@@ -1335,6 +1343,10 @@ Status RPL(int *pipe_down, int *pipe_up, const int noise) {
                 }
             }
         }
+    }
+    // Wait RDL's death.
+    while(1) {
+        usleep(500);
     }
 }
 
@@ -1448,4 +1460,32 @@ unsigned int count_ending_zeros(const char * const data, unsigned int data_lengt
     int counter = data_length;
     while (counter >= 0 && data[--counter] == 0) {};
     return data_length - 1 - counter;
+}
+
+Status htonl_tool(char *buffer) {
+    uint32_t kind = 0, seq = 0, ack = 0;
+    memcpy(&kind, buffer, sizeof(frame_kind));
+    memcpy(&seq, buffer, sizeof(seq_nr));
+    memcpy(&ack, buffer, sizeof(seq_nr));
+    kind = htonl(kind);
+    seq = htonl(seq);
+    ack = htonl(ack);
+    memcpy(buffer, &kind, sizeof(frame_kind));
+    memcpy(buffer, &seq, sizeof(seq_nr));
+    memcpy(buffer, &ack, sizeof(seq_nr));
+    return ALL_GOOD;
+}
+
+Status ntohl_tool(char *buffer) {
+    uint32_t kind = 0, seq = 0, ack = 0;
+    memcpy(&kind, buffer, sizeof(frame_kind));
+    memcpy(&seq, buffer, sizeof(seq_nr));
+    memcpy(&ack, buffer, sizeof(seq_nr));
+    kind = ntohl(kind);
+    seq = ntohl(seq);
+    ack = ntohl(ack);
+    memcpy(buffer, &kind, sizeof(frame_kind));
+    memcpy(buffer, &seq, sizeof(seq_nr));
+    memcpy(buffer, &ack, sizeof(seq_nr));
+    return ALL_GOOD;
 }

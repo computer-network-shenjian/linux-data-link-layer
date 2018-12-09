@@ -222,4 +222,8 @@ Status RPL(int *pipe_down, int *pipe_up, const int noise = 0);
 // Precondition: pipe.
 // Postcondition: status number.
 
+Status htonl_tool(char *buffer);
+
+Status ntohl_tool(char *buffer);
+
 #endif // SHARED_LIBRARY_H
